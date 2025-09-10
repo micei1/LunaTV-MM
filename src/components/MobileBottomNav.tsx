@@ -47,11 +47,6 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       label: '直播',
       href: '/live',
     },
-    {
-      icon: Box,
-      label: '盒子',
-      href: '/tvbox',
-    },
   ]);
 
   useEffect(() => {
