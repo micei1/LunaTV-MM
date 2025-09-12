@@ -2321,24 +2321,6 @@ function PlayPageClient() {
             },
           },
           {
-            html: '弹幕开关',
-            icon: '<text x="50%" y="50%" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle" fill="#ffffff">弹</text>',
-            tooltip: '弹幕显示/隐藏',
-            onClick() {
-              if (artPlayerRef.current?.plugins?.artplayerPluginDanmuku) {
-                const plugin = artPlayerRef.current.plugins.artplayerPluginDanmuku;
-                if (plugin.isHide) {
-                  plugin.show();
-                  return '弹幕已显示';
-                } else {
-                  plugin.hide();
-                  return '弹幕已隐藏';
-                }
-              }
-              return '弹幕功能未加载';
-            },
-          },
-          {
             name: '跳过片头片尾',
             html: '跳过片头片尾',
             switch: skipConfigRef.current.enable,
