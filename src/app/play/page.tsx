@@ -864,7 +864,7 @@ function PlayPageClient() {
   };
 
   // 更新视频地址
-  const updateVideoUrl = (
+  const updateVideoUrl = async (
     detailData: SearchResult | null,
     episodeIndex: number
   ) => {
@@ -876,9 +876,38 @@ function PlayPageClient() {
       setVideoUrl('');
       return;
     }
-    const newUrl = detailData?.episodes[episodeIndex] || '';
-    if (newUrl !== videoUrl) {
-      setVideoUrl(newUrl);
+
+    const episodeData = detailData.episodes[episodeIndex];
+
+    // 检查是否为短剧格式
+    if (episodeData && episodeData.startsWith('shortdrama:')) {
+      try {
+        const [, videoId, episode] = episodeData.split(':');
+        const response = await fetch(
+          `/api/shortdrama/parse?id=${videoId}&episode=${episode}`
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          const newUrl = result.url || '';
+          if (newUrl !== videoUrl) {
+            setVideoUrl(newUrl);
+          }
+        } else {
+          setError('短剧解析失败');
+          setVideoUrl('');
+        }
+      } catch (err) {
+        console.error('短剧URL解析失败:', err);
+        setError('短剧解析失败');
+        setVideoUrl('');
+      }
+    } else {
+      // 普通视频格式
+      const newUrl = episodeData || '';
+      if (newUrl !== videoUrl) {
+        setVideoUrl(newUrl);
+      }
     }
   };
 
@@ -1460,9 +1489,19 @@ function PlayPageClient() {
       id: string
     ): Promise<SearchResult[]> => {
       try {
-        const detailResponse = await fetch(
-          `/api/detail?source=${source}&id=${id}`
-        );
+        let detailResponse;
+
+        // 判断是否为短剧源
+        if (source === 'shortdrama') {
+          detailResponse = await fetch(
+            `/api/shortdrama/detail?id=${id}&episode=1`
+          );
+        } else {
+          detailResponse = await fetch(
+            `/api/detail?source=${source}&id=${id}`
+          );
+        }
+
         if (!detailResponse.ok) {
           throw new Error('获取视频详情失败');
         }
@@ -1561,15 +1600,23 @@ function PlayPageClient() {
           : '🔍 正在搜索播放源...'
       );
 
-      let sourcesInfo = await fetchSourcesData(searchTitle || videoTitle);
-      if (
-        currentSource &&
-        currentId &&
-        !sourcesInfo.some(
-          (source) => source.source === currentSource && source.id === currentId
-        )
-      ) {
+      let sourcesInfo: SearchResult[] = [];
+
+      // 对于短剧，直接获取详情，跳过搜索
+      if (currentSource === 'shortdrama' && currentId) {
         sourcesInfo = await fetchSourceDetail(currentSource, currentId);
+      } else {
+        // 其他情况先搜索
+        sourcesInfo = await fetchSourcesData(searchTitle || videoTitle);
+        if (
+          currentSource &&
+          currentId &&
+          !sourcesInfo.some(
+            (source) => source.source === currentSource && source.id === currentId
+          )
+        ) {
+          sourcesInfo = await fetchSourceDetail(currentSource, currentId);
+        }
       }
       if (sourcesInfo.length === 0) {
         setError('未找到匹配结果');
