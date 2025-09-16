@@ -563,15 +563,6 @@ export const UserMenu: React.FC = () => {
             </button>
           )}
 
-          {/* TVBox配置按钮 */}
-          <button
-            onClick={handleTVBoxConfig}
-            className='w-full px-3 py-2 text-left flex items-center gap-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm'
-          >
-            <Tv className='w-4 h-4 text-gray-500 dark:text-gray-400' />
-            <span className='font-medium'>TVBox 配置</span>
-          </button>
-
           {/* 修改密码按钮 */}
           {showChangePassword && (
             <button
