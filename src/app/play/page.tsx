@@ -129,7 +129,7 @@ function PlayPageClient() {
       const v = localStorage.getItem('enable_external_danmu');
       if (v !== null) return v === 'false';
     }
-    return true; // 默认开启外部弹幕
+    return false; // 默认关闭外部弹幕
   });
   const externalDanmuEnabledRef = useRef(externalDanmuEnabled);
   useEffect(() => {
