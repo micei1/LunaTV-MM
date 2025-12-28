@@ -170,7 +170,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* 快速筛选和导航栏 */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 sticky top-4 z-10">
         <div className="p-4">
@@ -495,6 +495,24 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
           </div>
         );
       })}
+
+      {/* 返回顶部按钮 */}
+      {total > 10 && (
+        <button
+          onClick={() => {
+            const modalContent = document.getElementById('netdisk-modal-content');
+            if (modalContent) {
+              modalContent.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+          className='fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-11 h-11 sm:w-12 sm:h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center active:scale-95 z-50 group'
+          aria-label='返回顶部'
+        >
+          <svg className='w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-y-[-2px] transition-transform' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M5 10l7-7m0 0l7 7m-7-7v18' />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
