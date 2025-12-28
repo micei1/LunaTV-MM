@@ -111,7 +111,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
     return (
       <div className={`${isFunctionDisabled ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'} border rounded-lg p-4 animate-fade-in`}>
         <div className="flex items-start">
-          <div className="flex-shrink-0 mt-0.5">
+          <div className="shrink-0 mt-0.5">
             {isFunctionDisabled ? (
               <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -395,7 +395,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
                         {/* 链接和密码 */}
                         <div className="space-y-2">
                           <div className="flex items-start space-x-2">
-                            <LinkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <LinkIcon className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                               <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded font-mono break-all block w-full">
                                 <span className="block sm:hidden">
@@ -408,7 +408,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
                             </div>
                             <button
                               onClick={() => copyToClipboard(link.url, `url-${linkKey}`)}
-                              className={`p-1 transition-colors flex-shrink-0 ${
+                              className={`p-1 transition-colors shrink-0 ${
                                 copiedItems[`url-${linkKey}`]
                                   ? 'text-green-500'
                                   : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
@@ -427,7 +427,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
 
                           {link.password && (
                             <div className="flex items-start space-x-2">
-                              <svg className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                               </svg>
                               <div className="flex-1 min-w-0">
@@ -435,7 +435,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
                                   {isPasswordVisible ? link.password : '****'}
                                 </code>
                               </div>
-                              <div className="flex items-center space-x-1 flex-shrink-0">
+                              <div className="flex items-center space-x-1 shrink-0">
                                 <button
                                   onClick={() => togglePasswordVisibility(linkKey)}
                                   className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -477,7 +477,7 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
                       </div>
 
                       {/* 操作按钮 */}
-                      <div className="sm:ml-4 flex-shrink-0">
+                      <div className="sm:ml-4 shrink-0">
                         <a
                           href={link.url}
                           target="_blank"
@@ -495,24 +495,6 @@ export default function NetDiskSearchResults({ results, loading, error, total }:
           </div>
         );
       })}
-
-      {/* 返回顶部按钮 */}
-      {total > 10 && (
-        <button
-          onClick={() => {
-            const modalContent = document.getElementById('netdisk-modal-content');
-            if (modalContent) {
-              modalContent.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          }}
-          className='fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-11 h-11 sm:w-12 sm:h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center active:scale-95 z-50 group'
-          aria-label='返回顶部'
-        >
-          <svg className='w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-y-[-2px] transition-transform' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M5 10l7-7m0 0l7 7m-7-7v18' />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }
