@@ -11,8 +11,12 @@ async function fetchTrailerWithRetry(id: string, retryCount = 0): Promise<string
   const TIMEOUT = 20000; // 20秒超时
   const RETRY_DELAY = 2000; // 2秒后重试
 
+  const startTime = Date.now();
+
   try {
     const mobileApiUrl = `https://m.douban.com/rexxar/api/v2/movie/${id}`;
+
+    console.log(`[refresh-trailer] 开始请求影片 ${id}${retryCount > 0 ? ` (重试 ${retryCount}/${MAX_RETRIES})` : ''}`);
 
     // 创建 AbortController 用于超时控制
     const controller = new AbortController();
@@ -35,6 +39,9 @@ async function fetchTrailerWithRetry(id: string, retryCount = 0): Promise<string
 
     clearTimeout(timeoutId);
 
+    const fetchTime = Date.now() - startTime;
+    console.log(`[refresh-trailer] 影片 ${id} 请求完成，耗时: ${fetchTime}ms, 状态: ${response.status}`);
+
     if (!response.ok) {
       throw new Error(`豆瓣API返回错误: ${response.status}`);
     }
@@ -43,18 +50,30 @@ async function fetchTrailerWithRetry(id: string, retryCount = 0): Promise<string
     const trailerUrl = data.trailers?.[0]?.video_url;
 
     if (!trailerUrl) {
+      console.warn(`[refresh-trailer] 影片 ${id} 没有预告片数据`);
       throw new Error('该影片没有预告片');
     }
 
+    const totalTime = Date.now() - startTime;
+    console.log(`[refresh-trailer] 影片 ${id} 成功获取trailer URL，总耗时: ${totalTime}ms`);
+
     return trailerUrl;
   } catch (error) {
+    const failTime = Date.now() - startTime;
+
     // 超时或网络错误，尝试重试
     if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('fetch'))) {
+      console.error(`[refresh-trailer] 影片 ${id} 请求失败 (耗时: ${failTime}ms): ${error.name === 'AbortError' ? '超时' : error.message}`);
+
       if (retryCount < MAX_RETRIES) {
-        console.warn(`[refresh-trailer] 请求失败，${RETRY_DELAY}ms后重试 (${retryCount + 1}/${MAX_RETRIES})...`);
+        console.warn(`[refresh-trailer] ${RETRY_DELAY}ms后重试 (${retryCount + 1}/${MAX_RETRIES})...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         return fetchTrailerWithRetry(id, retryCount + 1);
+      } else {
+        console.error(`[refresh-trailer] 影片 ${id} 重试次数已达上限，放弃请求`);
       }
+    } else {
+      console.error(`[refresh-trailer] 影片 ${id} 发生错误 (耗时: ${failTime}ms):`, error);
     }
 
     throw error;
