@@ -66,6 +66,17 @@ export default function HeroBanner({
     return url;
   };
 
+  // 确保 backdrop 是高清版本
+  const getHDBackdrop = (url?: string) => {
+    if (!url) return url;
+    return url
+      .replace('/view/photo/s/', '/view/photo/l/')
+      .replace('/view/photo/m/', '/view/photo/l/')
+      .replace('/view/photo/sqxs/', '/view/photo/l/')
+      .replace('/s_ratio_poster/', '/l_ratio_poster/')
+      .replace('/m_ratio_poster/', '/l_ratio_poster/');
+  };
+
   // 处理视频 URL，使用代理绕过防盗链
   const getProxiedVideoUrl = (url: string) => {
     if (url?.includes('douban') || url?.includes('doubanio')) {
@@ -186,7 +197,7 @@ export default function HeroBanner({
       const item = items[index];
       if (item) {
         const img = new window.Image();
-        const imageUrl = item.backdrop || item.poster;
+        const imageUrl = getHDBackdrop(item.backdrop) || item.poster;
         img.src = getProxiedImageUrl(imageUrl);
       }
     });
@@ -197,7 +208,7 @@ export default function HeroBanner({
   }
 
   const currentItem = items[currentIndex];
-  const backgroundImage = currentItem.backdrop || currentItem.poster;
+  const backgroundImage = getHDBackdrop(currentItem.backdrop) || currentItem.poster;
 
   // 🔍 调试日志
   console.log('[HeroBanner] 当前项目:', {
@@ -207,6 +218,23 @@ export default function HeroBanner({
     trailerUrl: currentItem.trailerUrl,
     enableVideo,
   });
+
+  // 🎯 检查并刷新缺失的 trailer URL（组件挂载时）
+  useEffect(() => {
+    const checkAndRefreshMissingTrailers = async () => {
+      for (const item of items) {
+        // 如果有 douban_id 但没有 trailerUrl，尝试获取
+        if (item.douban_id && !item.trailerUrl && !refreshedTrailerUrls[item.douban_id]) {
+          console.log('[HeroBanner] 检测到缺失的 trailer，尝试获取:', item.title);
+          await refreshTrailerUrl(item.douban_id);
+        }
+      }
+    };
+
+    // 延迟执行，避免阻塞初始渲染
+    const timer = setTimeout(checkAndRefreshMissingTrailers, 1000);
+    return () => clearTimeout(timer);
+  }, [items, refreshedTrailerUrls, refreshTrailerUrl]);
 
   return (
     <div
@@ -235,7 +263,7 @@ export default function HeroBanner({
             >
               {/* 背景图片（始终显示，作为视频的占位符） */}
               <Image
-                src={getProxiedImageUrl(item.backdrop || item.poster)}
+                src={getProxiedImageUrl(getHDBackdrop(item.backdrop) || item.poster)}
                 alt={item.title}
                 fill
                 className="object-cover object-center"
@@ -246,7 +274,7 @@ export default function HeroBanner({
               />
 
               {/* 视频背景（如果启用且有预告片URL，加载完成后淡入） */}
-              {enableVideo && item.trailerUrl && index === currentIndex && (
+              {enableVideo && getEffectiveTrailerUrl(item) && index === currentIndex && (
                 <video
                   ref={videoRef}
                   className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
@@ -266,8 +294,28 @@ export default function HeroBanner({
                     });
 
                     // 检测是否是403错误（trailer URL过期）
-                    // 如果有douban_id，尝试刷新URL
-                    if (item.douban_id && !refreshedTrailerUrls[item.douban_id]) {
+                    if (item.douban_id) {
+                      // 如果localStorage中有URL，说明之前刷新过，但现在又失败了
+                      // 需要清除localStorage中的旧URL，重新刷新
+                      if (refreshedTrailerUrls[item.douban_id]) {
+                        console.log('[HeroBanner] localStorage中的URL也过期了，清除并重新获取');
+
+                        // 清除state和localStorage中的旧URL
+                        setRefreshedTrailerUrls(prev => {
+                          const updated = { ...prev };
+                          delete updated[item.douban_id];
+
+                          try {
+                            localStorage.setItem('refreshed-trailer-urls', JSON.stringify(updated));
+                          } catch (error) {
+                            console.error('[HeroBanner] 清除localStorage失败:', error);
+                          }
+
+                          return updated;
+                        });
+                      }
+
+                      // 重新刷新URL
                       const newUrl = await refreshTrailerUrl(item.douban_id);
                       if (newUrl) {
                         // 重新加载视频
@@ -368,11 +416,11 @@ export default function HeroBanner({
         </div>
       </div>
 
-      {/* 音量控制按钮（仅视频模式） */}
-      {enableVideo && currentItem.trailerUrl && (
+      {/* 音量控制按钮（仅视频模式） - 底部右下角，避免遮挡简介 */}
+      {enableVideo && getEffectiveTrailerUrl(currentItem) && (
         <button
           onClick={toggleMute}
-          className="absolute bottom-28 sm:bottom-32 md:bottom-36 right-4 sm:right-8 md:right-12 lg:right-16 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-all border border-white/50"
+          className="absolute bottom-6 sm:bottom-8 right-4 sm:right-8 md:right-12 lg:right-16 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-all border border-white/50 z-10"
           aria-label={isMuted ? '取消静音' : '静音'}
         >
           {isMuted ? (
