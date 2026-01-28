@@ -1090,33 +1090,7 @@ function HomeClient() {
               </section>
 
               {/* 热门短剧 */}
-              <section className='mb-8'>
-                <div className='mb-4 flex items-center justify-between'>
-                  <SectionTitle title="热门短剧" icon={Play} iconColor="text-orange-500" />
-                  <Link
-                    href='/shortdrama'
-                    className='flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors'
-                  >
-                    查看更多
-                    <ChevronRight className='w-4 h-4 ml-1' />
-                  </Link>
-                </div>
-                <ScrollableRow enableVirtualization={true}>
-                  {loading
-                    ? // 加载状态显示灰色占位数据
-                    Array.from({ length: 8 }).map((_, index) => (
-                      <SkeletonCard key={index} />
-                    ))
-                    : // 显示真实数据
-                    hotShortDramas.map((drama, index) => (
-                      <ShortDramaCard
-                        key={index}
-                        drama={drama}
-                        className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44'
-                      />
-                    ))}
-                </ScrollableRow>
-              </section>
+
             </>
           )}
         </div>
