@@ -911,14 +911,103 @@ function HomeClient() {
           ) : (
             // 首页视图
             <>
-
               {/* Hero Banner 轮播 */}
-              
+
               {/* 继续观看 */}
               <ContinueWatching />
 
               {/* 即将上映 */}
-              
+              {(() => {
+                console.log('🔍 即将上映 section 渲染检查:', { loading, upcomingReleasesCount: upcomingReleases.length });
+                return null;
+              })()}
+              {!loading && upcomingReleases.length > 0 && (
+                <section className='mb-8'>
+                  <div className='mb-4 flex items-center justify-between'>
+                    <SectionTitle title="即将上映" icon={Calendar} iconColor="text-orange-500" />
+                    <Link
+                      href='/release-calendar'
+                      className='flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors'
+                    >
+                      查看更多
+                      <ChevronRight className='w-4 h-4 ml-1' />
+                    </Link>
+                  </div>
+
+                  {/* Tab 切换 */}
+                  <div className='mb-4 flex gap-2'>
+                    {[
+                      { key: 'all', label: '全部', count: upcomingReleases.length },
+                      { key: 'movie', label: '电影', count: upcomingReleases.filter(r => r.type === 'movie').length },
+                      { key: 'tv', label: '电视剧', count: upcomingReleases.filter(r => r.type === 'tv').length },
+                    ].map(({ key, label, count }) => (
+                      <button
+                        key={key}
+                        onClick={() => setUpcomingFilter(key as 'all' | 'movie' | 'tv')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          upcomingFilter === key
+                            ? 'bg-orange-500 text-white shadow-md'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {label}
+                        {count > 0 && (
+                          <span className={`ml-1.5 text-xs ${
+                            upcomingFilter === key
+                              ? 'text-white/80'
+                              : 'text-gray-500 dark:text-gray-400'
+                          }`}>
+                            ({count})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <ScrollableRow enableVirtualization={true}>
+                    {upcomingReleases
+                      .filter(release => upcomingFilter === 'all' || release.type === upcomingFilter)
+                      .map((release, index) => {
+                        // 计算距离上映还有几天
+                        const releaseDate = new Date(release.releaseDate);
+                        const daysDiff = Math.ceil((releaseDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                      // 根据天数差异显示不同文字
+                      let remarksText;
+                      if (daysDiff < 0) {
+                        remarksText = `已上映${Math.abs(daysDiff)}天`;
+                      } else if (daysDiff === 0) {
+                        remarksText = '今日上映';
+                      } else {
+                        remarksText = `${daysDiff}天后上映`;
+                      }
+
+                      return (
+                        <div
+                          key={`${release.id}-${index}`}
+                          className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44'
+                        >
+                          <VideoCard
+                            source='upcoming_release'
+                            id={release.id}
+                            source_name='即将上映'
+                            from='douban'
+                            title={release.title}
+                            poster={release.cover || '/placeholder-poster.jpg'}
+                            year={release.releaseDate.split('-')[0]}
+                            type={release.type}
+                            remarks={remarksText}
+                            releaseDate={release.releaseDate}
+                            query={release.title}
+                            episodes={release.episodes || (release.type === 'tv' ? undefined : 1)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </ScrollableRow>
+                </section>
+              )}
+
               {/* 热门电影 */}
               <section className='mb-8'>
                 <div className='mb-4 flex items-center justify-between'>
@@ -1089,8 +1178,37 @@ function HomeClient() {
                     ))}
                 </ScrollableRow>
               </section>
-              
+
               {/* 热门短剧 */}
+              <section className='mb-8'>
+                <div className='mb-4 flex items-center justify-between'>
+                  <SectionTitle title="热门短剧" icon={Play} iconColor="text-orange-500" />
+                  <Link
+                    href='/shortdrama'
+                    className='flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors'
+                  >
+                    查看更多
+                    <ChevronRight className='w-4 h-4 ml-1' />
+                  </Link>
+                </div>
+                <ScrollableRow enableVirtualization={true}>
+                  {loading
+                    ? // 加载状态显示灰色占位数据
+                    Array.from({ length: 8 }).map((_, index) => (
+                      <SkeletonCard key={index} />
+                    ))
+                    : // 显示真实数据
+                    hotShortDramas.map((drama, index) => (
+                      <ShortDramaCard
+                        key={index}
+                        drama={drama}
+                        className='min-w-[96px] w-24 sm:min-w-[180px] sm:w-44'
+                      />
+                    ))}
+                </ScrollableRow>
+              </section>
+            </>
+          )}
         </div>
       </div>
       {announcement && showAnnouncement && (
