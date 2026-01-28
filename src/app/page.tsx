@@ -912,9 +912,13 @@ function HomeClient() {
             // 首页视图
             <>
 
+              {/* Hero Banner 轮播 */}
+              
               {/* 继续观看 */}
               <ContinueWatching />
 
+              {/* 即将上映 */}
+              
               {/* 热门电影 */}
               <section className='mb-8'>
                 <div className='mb-4 flex items-center justify-between'>
@@ -1085,6 +1089,8 @@ function HomeClient() {
                     ))}
                 </ScrollableRow>
               </section>
+              
+              {/* 热门短剧 */}
         </div>
       </div>
       {announcement && showAnnouncement && (
