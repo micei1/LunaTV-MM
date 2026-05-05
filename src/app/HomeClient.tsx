@@ -160,6 +160,15 @@ function HomeClient({ initialConfig }: {
   // 🎯 优化：使用 useTransition 让 tab 切换不阻塞 UI
   const [isPending, startTransition] = useTransition();
 
+  // 🔥 所有 useState 必须在最前面，保证 Hook 调用顺序稳定
+  const [favoriteFilter, setFavoriteFilter] = useState<'all' | 'movie' | 'tv' | 'anime' | 'shortdrama' | 'live' | 'variety'>('all');
+  const [favoriteSortBy, setFavoriteSortBy] = useState<'recent' | 'title' | 'rating'>('recent');
+  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'movie' | 'tv'>('all');
+  const [reminderFilter, setReminderFilter] = useState<'all' | 'upcoming' | 'today' | 'released'>('all');
+  const [showClearFavoritesDialog, setShowClearFavoritesDialog] = useState(false);
+  const [showClearRemindersDialog, setShowClearRemindersDialog] = useState(false);
+  const [requireClearConfirmation, setRequireClearConfirmation] = useState(false);
+
   // 🔥 使用 useMemo 确保 config 对象引用稳定，避免 hooks 数量变化
   const stableConfig = useMemo(() => ({
     showHotMovies: initialConfig.showHotMovies,
@@ -303,6 +312,70 @@ function HomeClient({ initialConfig }: {
   }, [homeData?.hotShortDramas, state.hotShortDramas, homeFetching]);
 
   const bangumiCalendarData = homeData?.bangumiCalendar || [];
+
+  // 🚀 Memoize HeroBanner items to prevent unnecessary re-renders
+  // HeroBanner uses React.memo, but items array is recreated on every render
+  // This causes memo to fail shallow comparison and re-render unnecessarily
+  const heroBannerItems = useMemo(() => [
+    // 豆瓣电影
+    ...hotMovies.slice(0, 2).map((movie) => ({
+      id: movie.id,
+      title: movie.title,
+      poster: movie.poster,
+      backdrop: movie.backdrop,
+      trailerUrl: movie.trailerUrl,
+      description: movie.plot_summary,
+      year: movie.year,
+      rate: movie.rate,
+      douban_id: Number(movie.id),
+      type: 'movie',
+    })),
+    // 豆瓣电视剧
+    ...hotTvShows.slice(0, 2).map((show) => ({
+      id: show.id,
+      title: show.title,
+      poster: show.poster,
+      backdrop: show.backdrop,
+      trailerUrl: show.trailerUrl,
+      description: show.plot_summary,
+      year: show.year,
+      rate: show.rate,
+      douban_id: Number(show.id),
+      type: 'tv',
+    })),
+    // 豆瓣综艺
+    ...hotVarietyShows.slice(0, 1).map((show) => ({
+      id: show.id,
+      title: show.title,
+      poster: show.poster,
+      backdrop: show.backdrop,
+      trailerUrl: show.trailerUrl,
+      description: show.plot_summary,
+      year: show.year,
+      rate: show.rate,
+      douban_id: Number(show.id),
+      type: 'variety',
+    })),
+    // 豆瓣动漫
+    ...hotAnime.slice(0, 1).map((anime) => ({
+      id: anime.id,
+      title: anime.title,
+      poster: anime.poster,
+      backdrop: anime.backdrop,
+      trailerUrl: anime.trailerUrl,
+      description: anime.plot_summary,
+      year: anime.year,
+      rate: anime.rate,
+      douban_id: Number(anime.id),
+      type: 'anime',
+    }))
+  ], [hotMovies, hotTvShows, hotVarietyShows, hotAnime]);
+
+  // 🚀 Memoize enableVideo to prevent HeroBanner remount
+  // Reading window.RUNTIME_CONFIG on every render can cause props to change
+  const enableVideo = useMemo(() => {
+    return !(window as any).RUNTIME_CONFIG?.DISABLE_HERO_TRAILER;
+  }, []); // Empty deps - only read once on mount
 
   // 🚀 计算 loading 状态：数据获取中且没有任何数据时显示 loading
   // 使用 isFetching 而不是 isLoading，确保即使有缓存也会在重新获取时显示 loading
@@ -461,14 +534,6 @@ function HomeClient({ initialConfig }: {
         };
       });
   }, [allReminders]);
-
-  const [favoriteFilter, setFavoriteFilter] = useState<'all' | 'movie' | 'tv' | 'anime' | 'shortdrama' | 'live' | 'variety'>('all');
-  const [favoriteSortBy, setFavoriteSortBy] = useState<'recent' | 'title' | 'rating'>('recent');
-  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'movie' | 'tv'>('all');
-  const [reminderFilter, setReminderFilter] = useState<'all' | 'upcoming' | 'today' | 'released'>('all');
-  const [showClearFavoritesDialog, setShowClearFavoritesDialog] = useState(false);
-  const [showClearRemindersDialog, setShowClearRemindersDialog] = useState(false);
-  const [requireClearConfirmation, setRequireClearConfirmation] = useState(false);
 
   // 🎯 优化：缓存收藏夹统计信息计算
   const favoriteStats = useMemo(() => {
@@ -1231,67 +1296,14 @@ function HomeClient({ initialConfig }: {
             // 首页视图
             <>
               {/* Hero Banner 轮播 */}
-              {state.homePageConfig.showHeroBanner && (hotMovies.length > 0 || hotTvShows.length > 0 || hotVarietyShows.length > 0 || hotShortDramas.length > 0) && (
+              {state.homePageConfig.showHeroBanner && heroBannerItems.length > 0 && (
                 <section className='mb-8'>
                   <HeroBanner
-                    items={[
-                      // 豆瓣电影
-                      ...hotMovies.slice(0, 2).map((movie) => ({
-                        id: movie.id,
-                        title: movie.title,
-                        poster: movie.poster,
-                        backdrop: movie.backdrop,
-                        trailerUrl: movie.trailerUrl,
-                        description: movie.plot_summary,
-                        year: movie.year,
-                        rate: movie.rate,
-                        douban_id: Number(movie.id),
-                        type: 'movie',
-                      })),
-                      // 豆瓣电视剧
-                      ...hotTvShows.slice(0, 2).map((show) => ({
-                        id: show.id,
-                        title: show.title,
-                        poster: show.poster,
-                        backdrop: show.backdrop,
-                        trailerUrl: show.trailerUrl,
-                        description: show.plot_summary,
-                        year: show.year,
-                        rate: show.rate,
-                        douban_id: Number(show.id),
-                        type: 'tv',
-                      })),
-                      // 豆瓣综艺
-                      ...hotVarietyShows.slice(0, 1).map((show) => ({
-                        id: show.id,
-                        title: show.title,
-                        poster: show.poster,
-                        backdrop: show.backdrop,
-                        trailerUrl: show.trailerUrl,
-                        description: show.plot_summary,
-                        year: show.year,
-                        rate: show.rate,
-                        douban_id: Number(show.id),
-                        type: 'variety',
-                      })),
-                      // 豆瓣动漫
-                      ...hotAnime.slice(0, 1).map((anime) => ({
-                        id: anime.id,
-                        title: anime.title,
-                        poster: anime.poster,
-                        backdrop: anime.backdrop,
-                        trailerUrl: anime.trailerUrl,
-                        description: anime.plot_summary,
-                        year: anime.year,
-                        rate: anime.rate,
-                        douban_id: Number(anime.id),
-                        type: 'anime',
-                      }))
-                    ]}
+                    items={heroBannerItems}
                     autoPlayInterval={8000}
                     showControls={true}
                     showIndicators={true}
-                    enableVideo={!(window as any).RUNTIME_CONFIG?.DISABLE_HERO_TRAILER}
+                    enableVideo={enableVideo}
                   />
                 </section>
               )}

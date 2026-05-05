@@ -1,5 +1,19 @@
 import { AdminConfig } from './admin.types';
 
+// 崩溃日志数据结构
+export interface CrashLog {
+  timestamp: string;
+  message: string;
+  stack?: string;
+  digest?: string;
+  url: string;
+  userAgent: string;
+  memory: any;
+  localStorage: string;
+  type?: 'PAGE_ERROR' | 'GLOBAL_ERROR';
+  serverReceivedAt?: string;
+}
+
 // 播放记录数据结构
 export interface PlayRecord {
   title: string;
@@ -202,6 +216,12 @@ export interface IStorage {
     loginTime: number,
     isFirstLogin?: boolean
   ): Promise<void>;
+
+  // 崩溃日志相关
+  saveCrashLog(crashLog: CrashLog): Promise<void>;
+  getCrashLogs(limit?: number): Promise<CrashLog[]>;
+  deleteCrashLog(timestamp: string): Promise<void>;
+  clearCrashLogs(): Promise<void>;
 }
 
 // 搜索结果数据结构

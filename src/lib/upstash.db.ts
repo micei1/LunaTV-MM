@@ -1387,6 +1387,70 @@ export class UpstashRedisStorage implements IStorage {
       throw error;
     }
   }
+
+  // 崩溃日志相关
+  async saveCrashLog(crashLog: any): Promise<void> {
+    try {
+      const key = `crash-log:${crashLog.timestamp}`;
+      // 保存崩溃日志，设置 7 天 TTL (604800 秒)
+      await withRetry(() => this.client.set(key, JSON.stringify(crashLog), { ex: 604800 }));
+      console.log(`崩溃日志已保存: ${crashLog.timestamp}`);
+    } catch (error) {
+      console.error('保存崩溃日志失败:', error);
+      throw error;
+    }
+  }
+
+  async getCrashLogs(limit: number = 50): Promise<any[]> {
+    try {
+      // 获取所有崩溃日志的 key
+      const keys = await withRetry(() => this.client.keys('crash-log:*'));
+
+      if (keys.length === 0) {
+        return [];
+      }
+
+      // 批量获取崩溃日志
+      const logs = await withRetry(() => this.client.mget(...keys));
+
+      // 解析并排序（按时间戳降序）
+      const parsedLogs = logs
+        .filter((log): log is string => log !== null)
+        .map((log) => JSON.parse(log))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+
+      return parsedLogs;
+    } catch (error) {
+      console.error('获取崩溃日志失败:', error);
+      throw error;
+    }
+  }
+
+  async deleteCrashLog(timestamp: string): Promise<void> {
+    try {
+      const key = `crash-log:${timestamp}`;
+      await withRetry(() => this.client.del(key));
+      console.log(`崩溃日志已删除: ${timestamp}`);
+    } catch (error) {
+      console.error('删除崩溃日志失败:', error);
+      throw error;
+    }
+  }
+
+  async clearCrashLogs(): Promise<void> {
+    try {
+      const keys = await withRetry(() => this.client.keys('crash-log:*'));
+
+      if (keys.length > 0) {
+        await withRetry(() => this.client.del(...keys));
+        console.log(`已清除 ${keys.length} 条崩溃日志`);
+      }
+    } catch (error) {
+      console.error('清除崩溃日志失败:', error);
+      throw error;
+    }
+  }
 }
 
 // 单例 Upstash Redis 客户端

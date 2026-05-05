@@ -4,37 +4,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Query for refreshed trailer URLs cache
- * Replaces localStorage-based refreshedTrailerUrls state
- * Based on TanStack Query useQuery with initialData pattern (react-native example)
+ * Uses React Query cache instead of localStorage
+ * URLs are fetched from server (Redis cache) on demand
  */
 export function useRefreshedTrailerUrlsQuery() {
   return useQuery<Record<string, string>>({
     queryKey: ['refreshedTrailerUrls'],
     queryFn: () => {
-      // Read from localStorage as the source of truth
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('refreshed-trailer-urls');
-          return stored ? JSON.parse(stored) : {};
-        } catch (error) {
-          console.error('[HeroBanner] 读取localStorage失败:', error);
-          return {};
-        }
-      }
+      // Start with empty cache - URLs will be populated by mutations
       return {};
     },
-    // Initialize immediately from localStorage (no loading state)
-    initialData: () => {
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('refreshed-trailer-urls');
-          return stored ? JSON.parse(stored) : {};
-        } catch {
-          return {};
-        }
-      }
-      return {};
-    },
+    initialData: {},
     staleTime: Infinity, // Never refetch automatically - only updated via mutations
     gcTime: Infinity,
   });
@@ -88,21 +68,10 @@ export function useRefreshTrailerUrlMutation() {
     },
     onSuccess: (newUrl, { doubanId }) => {
       if (newUrl) {
-        // Update query cache with new URL, NO_TRAILER marker, or FAILED marker
+        // Update React Query cache with new URL
         queryClient.setQueryData<Record<string, string>>(
           ['refreshedTrailerUrls'],
-          (prev = {}) => {
-            const updated = { ...prev, [doubanId]: newUrl };
-
-            // Persist to localStorage
-            try {
-              localStorage.setItem('refreshed-trailer-urls', JSON.stringify(updated));
-            } catch (error) {
-              console.error('[HeroBanner] 保存到localStorage失败:', error);
-            }
-
-            return updated;
-          }
+          (prev = {}) => ({ ...prev, [doubanId]: newUrl })
         );
       }
     },
@@ -122,22 +91,14 @@ export function useClearTrailerUrlMutation() {
     { doubanId: number | string }
   >({
     mutationFn: async ({ doubanId }) => {
-      console.log('[HeroBanner] localStorage中的URL也过期了，清除并重新获取');
+      console.log('[HeroBanner] 清除过期的 trailer URL');
 
-      // Update query cache - remove the expired URL
+      // Update React Query cache - remove the expired URL
       queryClient.setQueryData<Record<string, string>>(
         ['refreshedTrailerUrls'],
         (prev = {}) => {
           const updated = { ...prev };
           delete updated[doubanId as string];
-
-          // Persist to localStorage
-          try {
-            localStorage.setItem('refreshed-trailer-urls', JSON.stringify(updated));
-          } catch (error) {
-            console.error('[HeroBanner] 清除localStorage失败:', error);
-          }
-
           return updated;
         }
       );
