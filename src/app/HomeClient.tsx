@@ -160,6 +160,21 @@ function HomeClient({ initialConfig }: {
   // 🎯 优化：使用 useTransition 让 tab 切换不阻塞 UI
   const [isPending, startTransition] = useTransition();
 
+  // 🔥 使用 useMemo 确保 config 对象引用稳定，避免 hooks 数量变化
+  const stableConfig = useMemo(() => ({
+    showHotMovies: initialConfig.showHotMovies,
+    showHotTvShows: initialConfig.showHotTvShows,
+    showHotVariety: initialConfig.showHotVariety,
+    showNewAnime: initialConfig.showNewAnime,
+    showHotShortDramas: initialConfig.showHotShortDramas,
+  }), [
+    initialConfig.showHotMovies,
+    initialConfig.showHotTvShows,
+    initialConfig.showHotVariety,
+    initialConfig.showNewAnime,
+    initialConfig.showHotShortDramas,
+  ]);
+
   // 🎯 优化：使用 useReducer 合并本地状态
   // 🔥 使用服务端传来的配置作为初始值
   const [state, dispatch] = useReducer(homeReducer, {
@@ -185,13 +200,7 @@ function HomeClient({ initialConfig }: {
     isFetching: homeFetching,
     errors: homeErrors,
     refetch: refetchHomeData,
-  } = useHomePageQueries({
-    showHotMovies: initialConfig.showHotMovies,
-    showHotTvShows: initialConfig.showHotTvShows,
-    showHotVariety: initialConfig.showHotVariety,
-    showNewAnime: initialConfig.showNewAnime,
-    showHotShortDramas: initialConfig.showHotShortDramas,
-  });
+  } = useHomePageQueries(stableConfig);
 
   const { announcement } = useSite();
 

@@ -2,10 +2,19 @@ import { NextResponse } from 'next/server';
 import { DEFAULT_USER_AGENT } from '@/lib/user-agent';
 import { recordRequest } from '@/lib/performance-monitor';
 import { db } from '@/lib/db';
+import { isVideoCached } from '@/lib/video-cache';
 
 /**
  * 刷新过期的 Douban trailer URL
- * 使用 Redis 全局缓存减少对豆瓣 API 的请求
+ *
+ * 三层缓存策略：
+ * 1. Redis URL 缓存（24小时）- 最快，存储豆瓣返回的 URL
+ * 2. 视频文件缓存（12小时）- 次快，本地已有视频文件时直接返回代理 URL
+ * 3. 豆瓣 API - 最慢，所有缓存都未命中时才请求
+ *
+ * 优势：
+ * - 即使 Redis URL 缓存过期，只要视频文件还在就不需要请求豆瓣
+ * - 大幅减少对豆瓣 API 的请求次数，避免被封 IP
  */
 
 // 缓存状态类型
@@ -200,19 +209,19 @@ export async function GET(request: Request) {
     console.log(`[refresh-trailer] 强制刷新，清除缓存: ${id}`);
     await clearCache(id);
   } else {
-    // 检查缓存
+    // 1. 检查 Redis URL 缓存
     const cached = await getCache(id);
     if (cached) {
       const now = Date.now();
       const age = Math.floor((now - cached.timestamp) / 1000); // 缓存年龄（秒）
 
-      console.log(`[refresh-trailer] 命中缓存: ${id}，状态: ${cached.status}，年龄: ${age}秒`);
+      console.log(`[refresh-trailer] 命中 Redis 缓存: ${id}，状态: ${cached.status}，年龄: ${age}秒`);
 
       // 根据状态返回不同响应
       if (cached.status === 'success' && cached.url) {
         const successResponse = {
           code: 200,
-          message: '获取成功（缓存）',
+          message: '获取成功（Redis 缓存）',
           data: {
             trailerUrl: cached.url,
           },
@@ -283,9 +292,58 @@ export async function GET(request: Request) {
         return NextResponse.json(failedResponse, { status: 500 });
       }
     }
+
+    // 2. 检查视频文件缓存（如果 Redis 缓存未命中）
+    const storageType = process.env.NEXT_PUBLIC_STORAGE_TYPE;
+    if (storageType === 'kvrocks') {
+      try {
+        // 构造一个临时 URL 用于检查缓存（只需要能提取 douban_id 即可）
+        const tempUrl = `https://vt1.doubanio.com/placeholder/M/${id}.mp4`;
+        const videoFileExists = await isVideoCached(tempUrl);
+
+        if (videoFileExists) {
+          console.log(`[refresh-trailer] 命中视频文件缓存: ${id}，返回代理 URL`);
+
+          // 返回指向视频代理的 URL（video-proxy 会直接从本地文件返回）
+          const cachedVideoUrl = `/api/video-proxy?url=${encodeURIComponent(tempUrl)}`;
+
+          const successResponse = {
+            code: 200,
+            message: '获取成功（视频文件缓存）',
+            data: {
+              trailerUrl: cachedVideoUrl,
+            },
+          };
+          const responseSize = Buffer.byteLength(JSON.stringify(successResponse), 'utf8');
+
+          recordRequest({
+            timestamp: startTime,
+            method: 'GET',
+            path: '/api/douban/refresh-trailer',
+            statusCode: 200,
+            duration: Date.now() - startTime,
+            memoryUsed: (process.memoryUsage().heapUsed - startMemory) / 1024 / 1024,
+            dbQueries: 0,
+            requestSize: 0,
+            responseSize,
+          });
+
+          return NextResponse.json(successResponse, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+        }
+      } catch (error) {
+        console.error('[refresh-trailer] 检查视频文件缓存失败:', error);
+        // 继续执行，降级到请求豆瓣
+      }
+    }
   }
 
-  // 缓存未命中或强制刷新，请求豆瓣 API
+  // 3. 缓存未命中或强制刷新，请求豆瓣 API
   try {
     const trailerUrl = await fetchTrailerWithRetry(id);
 
