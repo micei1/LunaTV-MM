@@ -12,11 +12,6 @@ import {
 } from '@/lib/bangumi.client';
 import { cleanExpiredCache, clearRecommendsCache } from '@/lib/shortdrama-cache';
 import { ShortDramaItem, ReleaseCalendarItem } from '@/lib/types';
-import {
-  getAllFavorites,
-  getAllPlayRecords,
-  getAllReminders,
-} from '@/lib/db.client';
 import { useClearFavoritesMutation } from '@/hooks/useFavoritesMutations';
 import { useClearRemindersMutation } from '@/hooks/useRemindersMutations';
 import { useHomePageQueries } from '@/hooks/useHomePageQueries';
@@ -24,6 +19,9 @@ import { getDoubanDetails } from '@/lib/douban.client';
 import { DoubanItem } from '@/lib/types';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 import { CinematicLoadingFallback } from '@/components/CinematicLoadingFallback';
+import { useFavoritesQuery } from '@/hooks/useFavoritesQuery';
+import { usePlayRecordsQuery } from '@/hooks/usePlayRecordsQuery';
+import { useRemindersQuery } from '@/hooks/useRemindersQuery';
 
 import CapsuleSwitch from '@/components/CapsuleSwitch';
 import ContinueWatching from '@/components/ContinueWatching';
@@ -123,27 +121,14 @@ const homeReducer = (state: HomeState, action: HomeAction): HomeState => {
   }
 };
 
-// Query Options 工厂函数
-const allFavoritesOptions = () => queryOptions({
-  queryKey: ['favorites'],
-  queryFn: () => getAllFavorites(),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-});
+// Query Options 工厂函数 - 使用新的 TanStack Query hooks
+import { favoritesQueryOptions } from '@/hooks/useFavoritesQuery';
+import { playRecordsQueryOptions } from '@/hooks/usePlayRecordsQuery';
+import { remindersQueryOptions } from '@/hooks/useRemindersQuery';
 
-const allPlayRecordsOptions = () => queryOptions({
-  queryKey: ['playRecords'],
-  queryFn: () => getAllPlayRecords(),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-});
-
-const allRemindersOptions = () => queryOptions({
-  queryKey: ['reminders'],
-  queryFn: () => getAllReminders(),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
-});
+const allFavoritesOptions = () => favoritesQueryOptions;
+const allPlayRecordsOptions = () => playRecordsQueryOptions;
+const allRemindersOptions = () => remindersQueryOptions;
 
 function HomeClient({ initialConfig }: {
   initialConfig: {

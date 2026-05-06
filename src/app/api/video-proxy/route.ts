@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { DEFAULT_USER_AGENT } from '@/lib/user-agent';
 import { isVideoCached, getCachedVideoPath, cacheVideoContent, deleteVideoCache } from '@/lib/video-cache';
+import { validateProxyTargetUrl } from '@/lib/proxy-security';
 import { promises as fs } from 'fs';
 import { createReadStream } from 'fs';
 import { db } from '@/lib/db';
@@ -17,11 +18,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing video URL' }, { status: 400 });
   }
 
-  // URL 格式验证
+  // SSRF 防护：验证目标 URL
   try {
-    new URL(videoUrl);
-  } catch {
-    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    await validateProxyTargetUrl(videoUrl);
+  } catch (error) {
+    console.error('[VideoProxy] SSRF validation failed:', error);
+    return NextResponse.json(
+      { error: 'Invalid or blocked URL' },
+      { status: 403 }
+    );
   }
 
   // 🎯 优先检查缓存（Kvrocks + 文件系统）

@@ -8,17 +8,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Gauge, RefreshCw, Wifi } from 'lucide-react';
 
 import { SearchResult } from '@/lib/types';
-import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
+import { getVideoResolutionFromM3u8, processImageUrl, VideoSourceTestResult } from '@/lib/utils';
 
-// 定义视频信息类型
-interface VideoInfo {
-  quality: string;
-  loadSpeed: string;
-  pingTime: number;
-  hasError?: boolean; // 添加错误状态标识
-}
+// 使用统一的视频测试结果类型
+type VideoInfo = VideoSourceTestResult;
 
 interface EpisodeSelectorProps {
   /** 总集数 */
@@ -72,6 +68,11 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   const [attemptedSources, setAttemptedSources] = useState<Set<string>>(
     new Set()
   );
+
+  // 手动测速相关状态
+  const [manualTesting, setManualTesting] = useState(false);
+  const [manualProgress, setManualProgress] = useState({ done: 0, total: 0 });
+  const [testingSourceKeys, setTestingSourceKeys] = useState<Set<string>>(new Set());
 
   // 使用 ref 来避免闭包问题
   const attemptedSourcesRef = useRef<Set<string>>(new Set());
@@ -137,6 +138,10 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
           loadSpeed: '未知',
           pingTime: 0,
           hasError: true,
+          status: 'failed',
+          message: error instanceof Error ? error.message : '测速失败',
+          playable: false,
+          testedAt: Date.now(),
         })
       );
     }
@@ -187,6 +192,85 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     }
     return false;
   });
+
+  // 手动测速函数
+  const handleManualSpeedTest = useCallback(async () => {
+    if (manualTesting || availableSources.length === 0) return;
+
+    setManualTesting(true);
+    setManualProgress({ done: 0, total: availableSources.length });
+
+    // 清空之前的测速结果
+    setVideoInfoMap(new Map());
+    setAttemptedSources(new Set());
+    attemptedSourcesRef.current = new Set();
+    videoInfoMapRef.current = new Map();
+
+    const batchSize = 3; // 每批测试3个源
+    let completed = 0;
+
+    for (let i = 0; i < availableSources.length; i += batchSize) {
+      const batch = availableSources.slice(i, i + batchSize);
+
+      // 标记正在测试的源
+      batch.forEach(source => {
+        const sourceKey = `${source.source}-${source.id}`;
+        setTestingSourceKeys(prev => new Set(prev).add(sourceKey));
+      });
+
+      await Promise.all(
+        batch.map(async (source) => {
+          const sourceKey = `${source.source}-${source.id}`;
+
+          if (!source.episodes || source.episodes.length === 0) {
+            completed++;
+            setManualProgress({ done: completed, total: availableSources.length });
+            setTestingSourceKeys(prev => {
+              const next = new Set(prev);
+              next.delete(sourceKey);
+              return next;
+            });
+            return;
+          }
+
+          const episodeUrl = source.episodes.length > 1 ? source.episodes[1] : source.episodes[0];
+
+          try {
+            const info = await getVideoResolutionFromM3u8(episodeUrl);
+            setVideoInfoMap(prev => new Map(prev).set(sourceKey, info));
+            setAttemptedSources(prev => new Set(prev).add(sourceKey));
+            attemptedSourcesRef.current.add(sourceKey);
+          } catch (error) {
+            setVideoInfoMap(prev =>
+              new Map(prev).set(sourceKey, {
+                quality: '错误',
+                loadSpeed: '未知',
+                pingTime: 9999,
+                hasError: true,
+                status: 'failed',
+                message: error instanceof Error ? error.message : '测速失败',
+                playable: false,
+                testedAt: Date.now(),
+              })
+            );
+            setAttemptedSources(prev => new Set(prev).add(sourceKey));
+            attemptedSourcesRef.current.add(sourceKey);
+          } finally {
+            completed++;
+            setManualProgress({ done: completed, total: availableSources.length });
+            setTestingSourceKeys(prev => {
+              const next = new Set(prev);
+              next.delete(sourceKey);
+              return next;
+            });
+          }
+        })
+      );
+    }
+
+    setManualTesting(false);
+    setTestingSourceKeys(new Set());
+  }, [manualTesting, availableSources]);
 
   // 当切换到换源tab并且有源数据时，异步获取视频信息 - 移除 attemptedSources 依赖避免循环触发
   useEffect(() => {
@@ -500,9 +584,41 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
         </>
       )}
 
-      {/* 换源 Tab 内容 */}
       {activeTab === 'sources' && (
         <div className='flex flex-col h-full mt-4'>
+          {/* 手动测速面板 */}
+          <div className='mb-4 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-200 dark:border-blue-700'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <Gauge className='w-5 h-5 text-blue-600 dark:text-blue-400' />
+                <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+                  视频源测速
+                </span>
+              </div>
+              <button
+                onClick={handleManualSpeedTest}
+                disabled={manualTesting || availableSources.length === 0}
+                className='flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition-all duration-200 active:scale-95 disabled:cursor-not-allowed'
+              >
+                <RefreshCw className={`w-4 h-4 ${manualTesting ? 'animate-spin' : ''}`} />
+                {manualTesting ? '测速中...' : '手动测速'}
+              </button>
+            </div>
+            {manualTesting && (
+              <div className='mt-2 flex items-center gap-2'>
+                <div className='flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden'>
+                  <div
+                    className='h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-300'
+                    style={{ width: `${(manualProgress.done / manualProgress.total) * 100}%` }}
+                  />
+                </div>
+                <span className='text-xs text-gray-600 dark:text-gray-400 font-mono'>
+                  {manualProgress.done}/{manualProgress.total}
+                </span>
+              </div>
+            )}
+          </div>
+
           {sourceSearchLoading && (
             <div className='flex items-center justify-center py-8'>
               <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-green-500'></div>
@@ -601,9 +717,9 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                         </div>
 
                         {/* 信息区域 */}
-                        <div className='flex-1 min-w-0 flex flex-col justify-between h-16 sm:h-20'>
-                          {/* 标题和分辨率 - 顶部 */}
-                          <div className='flex items-start justify-between gap-2 sm:gap-3 h-5 sm:h-6'>
+                        <div className='flex-1 min-w-0 flex flex-col justify-between h-16 sm:h-20 relative'>
+                          {/* 标题 - 顶部 */}
+                          <div className='flex items-start gap-2 sm:gap-3 h-5 sm:h-6'>
                             <div className='flex-1 min-w-0 relative group/title'>
                               <h3 className='font-medium text-sm sm:text-base truncate text-gray-900 dark:text-gray-100 leading-none'>
                                 {source.title}
@@ -616,43 +732,6 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                                 </div>
                               )}
                             </div>
-                            {(() => {
-                              const sourceKey = `${source.source}-${source.id}`;
-                              const videoInfo = videoInfoMap.get(sourceKey);
-
-                              if (videoInfo && videoInfo.quality !== '未知') {
-                                if (videoInfo.hasError) {
-                                  return (
-                                    <div className='bg-gray-500/10 dark:bg-gray-400/20 text-red-600 dark:text-red-400 px-1.5 py-0 rounded text-xs shrink-0 min-w-[50px] text-center'>
-                                      检测失败
-                                    </div>
-                                  );
-                                } else {
-                                  // 根据分辨率设置不同颜色：2K、4K为紫色，1080p、720p为绿色，其他为黄色
-                                  const isUltraHigh = ['4K', '2K'].includes(
-                                    videoInfo.quality
-                                  );
-                                  const isHigh = ['1080p', '720p'].includes(
-                                    videoInfo.quality
-                                  );
-                                  const textColorClasses = isUltraHigh
-                                    ? 'text-purple-600 dark:text-purple-400'
-                                    : isHigh
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-yellow-600 dark:text-yellow-400';
-
-                                  return (
-                                    <div
-                                      className={`bg-gray-500/10 dark:bg-gray-400/20 ${textColorClasses} px-1.5 py-0 rounded text-xs shrink-0 min-w-[50px] text-center`}
-                                    >
-                                      {videoInfo.quality}
-                                    </div>
-                                  );
-                                }
-                              }
-
-                              return null;
-                            })()}
                           </div>
 
                           {/* 源名称和集数信息 - 垂直居中 */}
@@ -672,8 +751,24 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                             {(() => {
                               const sourceKey = `${source.source}-${source.id}`;
                               const videoInfo = videoInfoMap.get(sourceKey);
+                              const isTesting = testingSourceKeys.has(sourceKey);
+
+                              if (isTesting) {
+                                return (
+                                  <div className='text-blue-600 dark:text-blue-400 font-medium text-[10px] sm:text-xs animate-pulse'>
+                                    正在测速...
+                                  </div>
+                                );
+                              }
+
                               if (videoInfo) {
-                                if (!videoInfo.hasError) {
+                                if (videoInfo.hasError || videoInfo.status === 'failed') {
+                                  return (
+                                    <div className='text-red-500/90 dark:text-red-400 font-medium text-[10px] sm:text-xs' title={videoInfo.message}>
+                                      {videoInfo.message || '测速失败'}
+                                    </div>
+                                  );
+                                } else if (!videoInfo.hasError) {
                                   return (
                                     <div className='flex items-end gap-2 sm:gap-3'>
                                       <div className='text-green-600 dark:text-green-400 font-medium text-[10px] sm:text-xs'>
@@ -684,16 +779,75 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                                       </div>
                                     </div>
                                   );
-                                } else {
-                                  return (
-                                    <div className='text-red-500/90 dark:text-red-400 font-medium text-[10px] sm:text-xs'>
-                                      无测速数据
-                                    </div>
-                                  ); // 占位div
                                 }
                               }
+
+                              return null;
                             })()}
                           </div>
+
+                          {/* 质量徽章 - 右下角绝对定位 */}
+                          {(() => {
+                            const sourceKey = `${source.source}-${source.id}`;
+                            const videoInfo = videoInfoMap.get(sourceKey);
+                            const isTesting = testingSourceKeys.has(sourceKey);
+
+                            // 正在测试中
+                            if (isTesting) {
+                              return (
+                                <div className='absolute bottom-0 right-0 flex items-center gap-1 bg-blue-500/10 dark:bg-blue-400/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded text-xs shrink-0'>
+                                  <RefreshCw className='w-3 h-3 animate-spin' />
+                                  <span>检测中</span>
+                                </div>
+                              );
+                            }
+
+                            if (videoInfo) {
+                              if (videoInfo.hasError || videoInfo.status === 'failed') {
+                                return (
+                                  <div className='absolute bottom-0 right-0 bg-red-500/10 dark:bg-red-400/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded text-xs shrink-0 min-w-[60px] text-center'>
+                                    检测失败
+                                  </div>
+                                );
+                              } else if (videoInfo.quality !== '未知') {
+                                // 根据分辨率设置不同颜色和图标
+                                const is4K = videoInfo.quality === '4K';
+                                const is2K = videoInfo.quality === '2K';
+                                const is1080p = videoInfo.quality === '1080p';
+                                const is720p = videoInfo.quality === '720p';
+
+                                let bgColor = 'bg-gray-500/10 dark:bg-gray-400/20';
+                                let textColor = 'text-gray-600 dark:text-gray-400';
+
+                                if (is4K || is2K) {
+                                  bgColor = 'bg-purple-500/10 dark:bg-purple-400/20';
+                                  textColor = 'text-purple-600 dark:text-purple-400';
+                                } else if (is1080p || is720p) {
+                                  bgColor = 'bg-green-500/10 dark:bg-green-400/20';
+                                  textColor = 'text-green-600 dark:text-green-400';
+                                } else if (videoInfo.quality === '480p' || videoInfo.quality === 'SD') {
+                                  bgColor = 'bg-yellow-500/10 dark:bg-yellow-400/20';
+                                  textColor = 'text-yellow-600 dark:text-yellow-400';
+                                }
+
+                                return (
+                                  <div className={`absolute bottom-0 right-0 flex items-center gap-1 ${bgColor} ${textColor} px-2 py-0.5 rounded text-xs shrink-0 font-semibold`}>
+                                    <Wifi className='w-3 h-3' />
+                                    <span>{videoInfo.quality}</span>
+                                  </div>
+                                );
+                              } else if (videoInfo.status === 'ok' || videoInfo.playable) {
+                                return (
+                                  <div className='absolute bottom-0 right-0 flex items-center gap-1 bg-green-500/10 dark:bg-green-400/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded text-xs shrink-0'>
+                                    <Wifi className='w-3 h-3' />
+                                    <span>已连通</span>
+                                  </div>
+                                );
+                              }
+                            }
+
+                            return null;
+                          })()}
                         </div>
                       </div>
                     );

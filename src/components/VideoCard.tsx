@@ -19,14 +19,14 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { useToggleFavoriteMutation } from '@/hooks/useFavoritesMutations';
 import { useToggleReminderMutation } from '@/hooks/useRemindersMutations';
 import { useDeletePlayRecordMutation } from '@/hooks/usePlayRecordsMutations';
+import { useIsFavoritedQuery } from '@/hooks/useFavoritesQuery';
+import { useIsRemindedQuery } from '@/hooks/useRemindersQuery';
 import { isAIRecommendFeatureDisabled } from '@/lib/ai-recommend.client';
 import {
   deleteFavorite,
   deletePlayRecord,
   deleteReminder,
   generateStorageKey,
-  isFavorited,
-  isReminded,
   saveFavorite,
   saveReminder,
   subscribeToDataUpdates,
@@ -205,37 +205,43 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(function VideoCard
            (isAggregate && dynamicSourceNames && dynamicSourceNames.length > 0);
   }, [remarks, hasReleaseTag, isAggregate, dynamicSourceNames]);
 
-  // 获取收藏/提醒状态
+  // 🔥 判断是否应该显示提醒按钮（即将上映或新上映）
+  const isNewRelease = remarks && (remarks.includes('已上映') || remarks.includes('今日上映'));
+  const shouldShowBell = isUpcoming || isNewRelease;
+
+  // 🚀 TanStack Query - 获取收藏/提醒状态
+  const { data: favoritedStatus } = useIsFavoritedQuery(
+    actualSource || '',
+    actualId || '',
+    { enabled: !!actualSource && !!actualId && !shouldShowBell }
+  );
+  const { data: remindedStatus } = useIsRemindedQuery(
+    actualSource || '',
+    actualId || '',
+    { enabled: !!actualSource && !!actualId && shouldShowBell }
+  );
+
+  // 同步 Query 结果到本地 state
+  useEffect(() => {
+    if (!shouldShowBell && favoritedStatus !== undefined) {
+      if (from === 'search') {
+        setSearchFavorited(favoritedStatus);
+      } else {
+        setFavorited(favoritedStatus);
+      }
+    }
+  }, [favoritedStatus, shouldShowBell, from]);
+
+  useEffect(() => {
+    if (shouldShowBell && remindedStatus !== undefined) {
+      setReminded(remindedStatus);
+    }
+  }, [remindedStatus, shouldShowBell]);
+
+  // 监听状态更新事件
   useEffect(() => {
     if (!actualSource || !actualId) return;
 
-    const fetchStatus = async () => {
-      try {
-        // 🔥 修复：检查是否是"新上映"的内容
-        const isNewRelease = remarks && (remarks.includes('已上映') || remarks.includes('今日上映'));
-        const shouldShowBell = isUpcoming || isNewRelease;
-
-        if (shouldShowBell) {
-          // 即将上映或新上映 → 检查提醒状态
-          const rem = await isReminded(actualSource, actualId);
-          setReminded(rem);
-        } else {
-          // 已上映 → 检查收藏状态
-          const fav = await isFavorited(actualSource, actualId);
-          if (from === 'search') {
-            setSearchFavorited(fav);
-          } else {
-            setFavorited(fav);
-          }
-        }
-      } catch (err) {
-        console.error('检查状态失败:', err);
-      }
-    };
-
-    fetchStatus();
-
-    // 监听状态更新事件
     const storageKey = generateStorageKey(actualSource, actualId);
 
     const unsubscribeFavorites = subscribeToDataUpdates(
@@ -522,30 +528,15 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(function VideoCard
     actualDoubanId,
   ]);
 
-  // 检查搜索结果的收藏状态
-  const checkSearchFavoriteStatus = useCallback(async () => {
-    if (from === 'search' && !isAggregate && actualSource && actualId && searchFavorited === null) {
-      try {
-        const fav = await isFavorited(actualSource, actualId);
-        setSearchFavorited(fav);
-      } catch (err) {
-        setSearchFavorited(false);
-      }
-    }
-  }, [from, isAggregate, actualSource, actualId, searchFavorited]);
-
   // 长按操作
   const handleLongPress = useCallback(() => {
     if (!showMobileActions) { // 防止重复触发
       // 立即显示菜单，避免等待数据加载导致动画卡顿
       setShowMobileActions(true);
 
-      // 异步检查收藏状态，不阻塞菜单显示
-      if (from === 'search' && !isAggregate && actualSource && actualId && searchFavorited === null) {
-        checkSearchFavoriteStatus();
-      }
+      // 收藏状态已由 useIsFavoritedQuery 自动处理
     }
-  }, [showMobileActions, from, isAggregate, actualSource, actualId, searchFavorited, checkSearchFavoriteStatus]);
+  }, [showMobileActions, from, isAggregate, actualSource, actualId, searchFavorited]);
 
   // 长按手势hook
   const longPressProps = useLongPress({
@@ -884,10 +875,7 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(function VideoCard
           // 右键弹出操作菜单
           setShowMobileActions(true);
 
-          // 异步检查收藏状态，不阻塞菜单显示
-          if (from === 'search' && !isAggregate && actualSource && actualId && searchFavorited === null) {
-            checkSearchFavoriteStatus();
-          }
+          // 收藏状态已由 useIsFavoritedQuery 自动处理
 
           return false;
         }}
