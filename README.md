@@ -25,7 +25,7 @@
 ![HLS.js](https://img.shields.io/badge/HLS.js-1.6.16-ec407a)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Docker Ready](https://img.shields.io/badge/Docker-ready-blue?logo=docker)
-![Version](https://img.shields.io/badge/Version-6.5.2-orange)
+![Version](https://img.shields.io/badge/Version-6.5.3-orange)
 
 </div>
 
@@ -33,7 +33,7 @@
 
 ## 📢 项目说明
 
-本项目是在 **MoonTV** 基础上进行的深度二次开发版本，从 **v4.3.1** 版本开始，持续迭代至当前 **v6.5.2**，累计新增 60+ 重大功能模块，400+ 细节优化。所有新增功能详见 [CHANGELOG](CHANGELOG)。
+本项目是在 **MoonTV** 基础上进行的深度二次开发版本，从 **v4.3.1** 版本开始，持续迭代至当前 **v6.5.3**，累计新增 60+ 重大功能模块，400+ 细节优化。所有新增功能详见 [CHANGELOG](CHANGELOG)。
 
 ## ⚠️ 重要声明
 
@@ -54,6 +54,7 @@
 - **搜索列表视图**：支持列表/网格双视图模式切换，列表模式带图片预览和快捷播放
 
 ### 🎬 播放器增强
+- **剧集选择器增强**：手动速度测试功能，实时显示源状态徽章（可用/不可用/测试中）
 - **控制栏透明度控制**：可自定义控制栏遮挡度（10-80%），实时调整透明度和模糊效果，改善字幕可见性
 - **快进快退按钮**：可自定义时间间隔的快进快退按钮，Netflix 风格设计，响应式布局
 - **超宽显示器适配**：视频显示模式控制，完美支持超宽显示器

@@ -5,6 +5,7 @@
 import { ExternalLink, Layers, Server, Tv } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { ClientCache } from '@/lib/client-cache';
 import PageLayout from '@/components/PageLayout';
@@ -24,19 +25,75 @@ type Item = {
 export default function SourceBrowserPage() {
   const router = useRouter();
 
-  const [sources, setSources] = useState<Source[]>([]);
-  const [loadingSources, setLoadingSources] = useState(true);
-  const [sourceError, setSourceError] = useState<string | null>(null);
   const [activeSourceKey, setActiveSourceKey] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | number>('');
+
+  // 🔄 使用 TanStack Query 获取源列表
+  const {
+    data: sourcesData,
+    isLoading: loadingSources,
+    error: sourceError,
+  } = useQuery({
+    queryKey: ['sourceBrowser', 'sites'],
+    queryFn: async () => {
+      const res = await fetch('/api/source-browser/sites');
+      if (res.status === 401) {
+        throw new Error('登录状态已失效，请重新登录');
+      }
+      if (res.status === 403) {
+        throw new Error('当前账号暂无可用资源站点');
+      }
+      if (!res.ok) throw new Error('获取源失败');
+      const data = await res.json();
+      return data.sources || [];
+    },
+    staleTime: 30 * 60 * 1000, // 30 分钟 - 源列表很少变化
+    gcTime: 60 * 60 * 1000,     // 1 小时
+  });
+
+  const sources: Source[] = sourcesData || [];
   const activeSource = useMemo(
     () => sources.find((s) => s.key === activeSourceKey),
     [sources, activeSourceKey]
   );
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | number>('');
+  // 🔄 使用 TanStack Query 获取分类列表
+  const {
+    data: categoriesData,
+    isLoading: loadingCategories,
+    error: categoryError,
+  } = useQuery({
+    queryKey: ['sourceBrowser', 'categories', activeSourceKey],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/source-browser/categories?source=${encodeURIComponent(activeSourceKey)}`
+      );
+      if (!res.ok) throw new Error('获取分类失败');
+      const data = await res.json();
+      return data.categories || [];
+    },
+    staleTime: 30 * 60 * 1000, // 30 分钟 - 分类列表很少变化
+    gcTime: 60 * 60 * 1000,     // 1 小时
+    enabled: !!activeSourceKey, // 只在有选中的源时才请求
+  });
+
+  const categories: Category[] = categoriesData || [];
+
+  // 当源列表加载完成时，自动选择第一个源
+  useEffect(() => {
+    if (sources.length > 0 && !activeSourceKey) {
+      setActiveSourceKey(sources[0].key);
+    }
+  }, [sources, activeSourceKey]);
+
+  // 当分类列表加载完成时，自动选择第一个分类
+  useEffect(() => {
+    if (categories.length > 0 && !activeCategory) {
+      setActiveCategory(categories[0].type_id);
+    } else if (categories.length === 0) {
+      setActiveCategory('');
+    }
+  }, [categories, activeCategory]);
 
   const [items, setItems] = useState<Item[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -87,59 +144,6 @@ export default function SourceBrowserPage() {
   const [previewBangumiLoading, setPreviewBangumiLoading] = useState(false);
   const [previewSearchPick, setPreviewSearchPick] = useState<GlobalSearchResult | null>(null);
 
-  const fetchSources = useCallback(async () => {
-    setLoadingSources(true);
-    setSourceError(null);
-    try {
-      const res = await fetch('/api/source-browser/sites', {
-        cache: 'no-store',
-      });
-      if (res.status === 401) {
-        throw new Error('登录状态已失效，请重新登录');
-      }
-      if (res.status === 403) {
-        throw new Error('当前账号暂无可用资源站点');
-      }
-      if (!res.ok) throw new Error('获取源失败');
-      const data = await res.json();
-      const list: Source[] = data.sources || [];
-      setSources(list);
-      if (list.length > 0) {
-        setActiveSourceKey(list[0].key);
-      }
-    } catch (e: unknown) {
-      setSourceError(e instanceof Error ? e.message : '获取源失败');
-    } finally {
-      setLoadingSources(false);
-    }
-  }, []);
-
-  const fetchCategories = useCallback(async (sourceKey: string) => {
-    if (!sourceKey) return;
-    setLoadingCategories(true);
-    setCategoryError(null);
-    try {
-      const res = await fetch(
-        `/api/source-browser/categories?source=${encodeURIComponent(sourceKey)}`
-      );
-      if (!res.ok) throw new Error('获取分类失败');
-      const data = await res.json();
-      const list: Category[] = data.categories || [];
-      setCategories(list);
-      if (list.length > 0) {
-        setActiveCategory(list[0].type_id);
-      } else {
-        setActiveCategory('');
-      }
-    } catch (e: unknown) {
-      setCategoryError(e instanceof Error ? e.message : '获取分类失败');
-      setCategories([]);
-      setActiveCategory('');
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, []);
-
   const fetchItems = useCallback(
     async (
       sourceKey: string,
@@ -186,12 +190,7 @@ export default function SourceBrowserPage() {
     []
   );
 
-  useEffect(() => {
-    fetchSources();
-  }, [fetchSources]);
-  useEffect(() => {
-    if (activeSourceKey) fetchCategories(activeSourceKey);
-  }, [activeSourceKey, fetchCategories]);
+  // 当分类变化时加载内容
   useEffect(() => {
     if (activeSourceKey && activeCategory && mode === 'category') {
       // 重置列表并加载第一页
@@ -598,7 +597,9 @@ export default function SourceBrowserPage() {
               </div>
             ) : sourceError ? (
               <div className='flex items-center gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'>
-                <span className='text-sm text-red-600 dark:text-red-400'>{sourceError}</span>
+                <span className='text-sm text-red-600 dark:text-red-400'>
+                  {sourceError instanceof Error ? sourceError.message : '获取源失败'}
+                </span>
               </div>
             ) : sources.length === 0 ? (
               <div className='text-center py-8'>
@@ -755,7 +756,7 @@ export default function SourceBrowserPage() {
                     </div>
                   ) : categoryError ? (
                     <div className='flex items-center gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400'>
-                      {categoryError}
+                      {categoryError instanceof Error ? categoryError.message : '获取分类失败'}
                     </div>
                   ) : categories.length === 0 ? (
                     <div className='text-center w-full py-6'>

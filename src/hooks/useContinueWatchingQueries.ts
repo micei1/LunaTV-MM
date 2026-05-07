@@ -38,8 +38,6 @@ export function useContinueWatchingQuery() {
  * Fetch watching updates (new episodes detection)
  * Uses the new TanStack Query implementation
  */
-export function useWatchingUpdatesQuery(hasPlayRecords: boolean) {
-  return useWatchingUpdates({
-    enabled: hasPlayRecords,
-  });
+export function useWatchingUpdatesQuery(options?: { enabled?: boolean }) {
+  return useWatchingUpdates(options);
 }

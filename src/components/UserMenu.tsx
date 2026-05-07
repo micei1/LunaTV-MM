@@ -85,7 +85,7 @@ export const UserMenu: React.FC = () => {
   // 🚀 TanStack Query - 追番更新
   const showWatchingUpdates = authInfo?.username && storageType !== 'localstorage';
   const { data: watchingUpdates } = useWatchingUpdatesQuery({
-    enabled: showWatchingUpdates && isOpen,
+    enabled: showWatchingUpdates, // 页面加载时就检查（会使用缓存）
   });
   const refreshWatchingUpdates = useRefreshWatchingUpdates();
 

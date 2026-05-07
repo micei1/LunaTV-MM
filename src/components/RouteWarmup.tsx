@@ -26,6 +26,9 @@ const warmedRoutes = new Set<string>();
 function shouldSkipWarmup() {
   if (typeof navigator === 'undefined') return true;
 
+  // Skip warmup if user is not authenticated
+  if (!document.cookie.includes('user_auth=')) return true;
+
   const connection = (
     navigator as Navigator & {
       connection?: {
@@ -48,6 +51,11 @@ export default function RouteWarmup() {
   const pathname = usePathname();
 
   useEffect(() => {
+    // Skip warmup on auth pages
+    if (pathname === '/login' || pathname === '/register' || pathname === '/oidc-register') {
+      return;
+    }
+
     if (shouldSkipWarmup()) return;
 
     let cancelled = false;

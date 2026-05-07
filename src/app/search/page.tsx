@@ -570,8 +570,8 @@ function SearchPageClient() {
       initialValue: STREAMED_INITIAL,
     }),
     enabled: !!trimmedQuery && useFluidSearch,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - cache search results for quick back navigation
+    gcTime: 5 * 60 * 1000,      // 5 minutes - keep in cache longer for search history
   });
 
   // 传统搜索
@@ -583,8 +583,8 @@ function SearchPageClient() {
       return Array.isArray(data.results) ? (data.results as SearchResult[]) : [];
     },
     enabled: !!trimmedQuery && !useFluidSearch,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - cache search results for quick back navigation
+    gcTime: 5 * 60 * 1000,      // 5 minutes - keep in cache longer for search history
   });
 
   // 派生统一搜索状态
