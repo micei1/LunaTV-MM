@@ -65,21 +65,16 @@ export function CinematicLoadingFallback() {
 
   return (
     <div
-      className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-opacity duration-500 ${
+      className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-opacity duration-500 bg-gradient-to-b from-gray-900 via-gray-800 to-black ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      {/* Bing wallpaper background */}
+      {/* Bing wallpaper background - fades in when loaded */}
       {bingWallpaper && (
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
           style={{ backgroundImage: `url(${bingWallpaper})` }}
         />
-      )}
-
-      {/* Fallback gradient background */}
-      {!bingWallpaper && (
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-black" />
       )}
 
       {/* Gradient overlay layers (like login page) */}

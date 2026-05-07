@@ -74,6 +74,17 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   const [manualProgress, setManualProgress] = useState({ done: 0, total: 0 });
   const [testingSourceKeys, setTestingSourceKeys] = useState<Set<string>>(new Set());
 
+  // 排序模式状态：'original' | 'speed' | 'name'
+  const [sortMode, setSortMode] = useState<'original' | 'speed' | 'name'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('episodeSelectorSortMode');
+      if (saved === 'speed' || saved === 'name' || saved === 'original') {
+        return saved;
+      }
+    }
+    return 'original';
+  });
+
   // 使用 ref 来避免闭包问题
   const attemptedSourcesRef = useRef<Set<string>>(new Set());
   const videoInfoMapRef = useRef<Map<string, VideoInfo>>(new Map());
@@ -270,6 +281,10 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
 
     setManualTesting(false);
     setTestingSourceKeys(new Set());
+
+    // 测速完成后自动切换到速度排序
+    setSortMode('speed');
+    localStorage.setItem('episodeSelectorSortMode', 'speed');
   }, [manualTesting, availableSources]);
 
   // 当切换到换源tab并且有源数据时，异步获取视频信息 - 移除 attemptedSources 依赖避免循环触发
@@ -619,6 +634,58 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
             )}
           </div>
 
+          {/* 排序模式切换 */}
+          <div className='mb-4 flex items-center gap-2'>
+            <span className='text-xs text-gray-600 dark:text-gray-400'>排序:</span>
+            <div className='flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg'>
+              <button
+                onClick={() => {
+                  setSortMode('original');
+                  localStorage.setItem('episodeSelectorSortMode', 'original');
+                }}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                  sortMode === 'original'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                原始
+              </button>
+              <button
+                onClick={() => {
+                  setSortMode('speed');
+                  localStorage.setItem('episodeSelectorSortMode', 'speed');
+                }}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1 ${
+                  sortMode === 'speed'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Gauge className='w-3 h-3' />
+                速度
+              </button>
+              <button
+                onClick={() => {
+                  setSortMode('name');
+                  localStorage.setItem('episodeSelectorSortMode', 'name');
+                }}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                  sortMode === 'name'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                名称
+              </button>
+            </div>
+            {sortMode === 'speed' && (
+              <span className='text-xs text-blue-600 dark:text-blue-400 font-medium animate-fade-in'>
+                ⚡ 最快优先
+              </span>
+            )}
+          </div>
+
           {sourceSearchLoading && (
             <div className='flex items-center justify-center py-8'>
               <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-green-500'></div>
@@ -664,8 +731,41 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                     const bIsCurrent =
                       b.source?.toString() === currentSource?.toString() &&
                       b.id?.toString() === currentId?.toString();
+
+                    // 当前源始终排在最前面
                     if (aIsCurrent && !bIsCurrent) return -1;
                     if (!aIsCurrent && bIsCurrent) return 1;
+
+                    // 根据排序模式排序
+                    if (sortMode === 'speed') {
+                      const aKey = `${a.source}-${a.id}`;
+                      const bKey = `${b.source}-${b.id}`;
+                      const aInfo = videoInfoMap.get(aKey);
+                      const bInfo = videoInfoMap.get(bKey);
+
+                      // 有测速结果的排在前面
+                      if (aInfo && !bInfo) return -1;
+                      if (!aInfo && bInfo) return 1;
+
+                      // 都有测速结果，按延迟排序（低到高）
+                      if (aInfo && bInfo) {
+                        // 可播放的排在不可播放的前面
+                        const aPlayable = aInfo.playable !== false;
+                        const bPlayable = bInfo.playable !== false;
+                        if (aPlayable && !bPlayable) return -1;
+                        if (!aPlayable && bPlayable) return 1;
+
+                        // 都可播放，按延迟排序
+                        if (aPlayable && bPlayable) {
+                          return (aInfo.pingTime || Infinity) - (bInfo.pingTime || Infinity);
+                        }
+                      }
+                    } else if (sortMode === 'name') {
+                      // 按名称排序
+                      return (a.title || '').localeCompare(b.title || '', 'zh-CN');
+                    }
+
+                    // 默认保持原始顺序
                     return 0;
                   })
                   .map((source, index) => {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { getCacheTime } from '@/lib/config';
+
 /**
  * Bangumi API 代理路由
  * 解决客户端直接调用 Bangumi API 可能遇到的 CORS 问题
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const apiUrl = `https://api.bgm.tv/${path}`;
+    const cacheTime = await getCacheTime();
 
     const response = await fetch(apiUrl, {
       headers: {
@@ -28,8 +31,7 @@ export async function GET(request: NextRequest) {
         'Accept': 'application/json',
       },
       next: {
-        // 缓存5分钟
-        revalidate: 300,
+        revalidate: cacheTime,
       },
     });
 
@@ -45,7 +47,9 @@ export async function GET(request: NextRequest) {
     // 返回数据，并设置 CORS 头允许前端访问
     return NextResponse.json(data, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
+        'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+        'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
       },
     });
   } catch (error) {

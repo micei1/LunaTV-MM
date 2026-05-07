@@ -187,19 +187,18 @@ export async function GET(request: NextRequest) {
 
     const result = await getRecommendedShortDramasInternal(categoryNum, pageSize);
 
-    // 测试1小时HTTP缓存策略
+    // 使用统一的缓存时间（默认2小时）
+    const cacheTime = await getCacheTime();
     const response = NextResponse.json(result);
 
-    console.log('🕐 [RECOMMEND] 设置1小时HTTP缓存 - 测试自动过期刷新');
+    console.log(`🕐 [RECOMMEND] 设置 ${cacheTime / 3600} 小时 HTTP 缓存`);
 
-    // 1小时 = 3600秒
-    const cacheTime = 3600;
     response.headers.set('Cache-Control', `public, max-age=${cacheTime}, s-maxage=${cacheTime}`);
     response.headers.set('CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
     response.headers.set('Vercel-CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
 
     // 调试信息
-    response.headers.set('X-Cache-Duration', '1hour');
+    response.headers.set('X-Cache-Duration', `${cacheTime / 3600}hours`);
     response.headers.set('X-Cache-Expires-At', new Date(Date.now() + cacheTime * 1000).toISOString());
     response.headers.set('X-Debug-Timestamp', new Date().toISOString());
 

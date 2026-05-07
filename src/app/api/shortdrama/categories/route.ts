@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getConfig } from '@/lib/config';
+import { getCacheTime, getConfig } from '@/lib/config';
 import { DEFAULT_USER_AGENT } from '@/lib/user-agent';
 
 // 强制动态路由，禁用所有缓存
@@ -98,19 +98,18 @@ export async function GET() {
   try {
     const categories = await getShortDramaCategoriesInternal();
 
-    // 设置与网页端一致的缓存策略（categories: 4小时）
+    // 设置与网页端一致的缓存策略（categories: 2小时）
+    const cacheTime = await getCacheTime();
     const response = NextResponse.json(categories);
 
-    console.log('🕐 [CATEGORIES] 设置4小时HTTP缓存 - 与网页端categories缓存一致');
+    console.log(`🕐 [CATEGORIES] 设置 ${cacheTime / 3600} 小时 HTTP 缓存`);
 
-    // 4小时 = 14400秒（与网页端SHORTDRAMA_CACHE_EXPIRE.categories一致）
-    const cacheTime = 14400;
     response.headers.set('Cache-Control', `public, max-age=${cacheTime}, s-maxage=${cacheTime}`);
     response.headers.set('CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
     response.headers.set('Vercel-CDN-Cache-Control', `public, s-maxage=${cacheTime}`);
 
     // 调试信息
-    response.headers.set('X-Cache-Duration', '4hour');
+    response.headers.set('X-Cache-Duration', `${cacheTime / 3600}hours`);
     response.headers.set('X-Cache-Expires-At', new Date(Date.now() + cacheTime * 1000).toISOString());
     response.headers.set('X-Debug-Timestamp', new Date().toISOString());
 
