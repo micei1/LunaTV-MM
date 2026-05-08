@@ -1488,7 +1488,7 @@ function PlayPageClient() {
     console.log('按权重排序后的源:', weightedSources.map(s => `${s.source_name}(${weights[s.source] ?? 50})`));
 
     // 使用全局统一的设备检测结果
-    const _isIPad = /iPad/i.test(userAgent) || (userAgent.includes('Macintosh') && navigator.maxTouchPoints >= 1);
+    const _isIPad = /iPad/i.test(userAgent) || (userAgent.includes('Macintosh') && typeof navigator !== 'undefined' && navigator.maxTouchPoints >= 1);
     const _isIOS = isIOSGlobal;
     const isIOS13 = isIOS13Global;
     const isMobile = isMobileGlobal;
@@ -2228,7 +2228,7 @@ function PlayPageClient() {
   // 检测移动设备（在组件层级定义）- 参考ArtPlayer compatibility.js
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const isIOSGlobal = /iPad|iPhone|iPod/i.test(userAgent) && !(window as any).MSStream;
-  const isIOS13Global = isIOSGlobal || (userAgent.includes('Macintosh') && navigator.maxTouchPoints >= 1);
+  const isIOS13Global = isIOSGlobal || (userAgent.includes('Macintosh') && typeof navigator !== 'undefined' && navigator.maxTouchPoints >= 1);
   const isMobileGlobal = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || isIOS13Global;
 
   // 内存压力检测和清理（针对移动设备）
@@ -4762,7 +4762,7 @@ function PlayPageClient() {
           artplayerPluginDanmuku((() => {
             // 🎯 设备性能检测
             const getDevicePerformance = () => {
-              const hardwareConcurrency = navigator.hardwareConcurrency || 2
+              const hardwareConcurrency = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 2) : 2
               const memory = (performance as any).memory?.jsHeapSizeLimit || 0
               
               // 简单性能评分（0-1）
@@ -5316,7 +5316,7 @@ function PlayPageClient() {
 
         // 移动端弹幕配置按钮点击切换支持 - 基于ArtPlayer设置按钮原理
         const addMobileDanmakuToggle = () => {
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
           setTimeout(() => {
             const configButton = document.querySelector('.artplayer-plugin-danmuku .apd-config');

@@ -36,7 +36,7 @@ export default function RegisterDisabledPage({ reason }: RegisterDisabledPagePro
   }, []);
 
   return (
-    <div className='relative min-h-screen flex items-center justify-center px-4 overflow-hidden bg-gradient-to-br from-purple-100 via-blue-50 to-pink-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900'>
+    <div className='fixed inset-0 z-50 flex items-center justify-center px-4 overflow-hidden bg-gradient-to-br from-purple-100 via-blue-50 to-pink-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900'>
       {/* Bing 每日壁纸背景 */}
       {bingWallpaper && (
         <div

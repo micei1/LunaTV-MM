@@ -346,9 +346,8 @@ export function useWatchingUpdatesQuery(options?: {
             if (mappedSource) {
               sourceKey = mappedSource;
               console.log(`[追番更新] 映射数据源: ${sourceName} -> ${sourceKey}`);
-            } else {
-              console.warn(`[追番更新] 找不到数据源 ${sourceName} 的映射，使用原始名称`);
             }
+            // 如果找不到映射，说明 sourceName 本身就是 API key，直接使用
           }
 
           const updateInfo = await checkSingleRecordUpdate(record, videoId, sourceKey);
@@ -581,7 +580,7 @@ export function useWatchingUpdatesQuery(options?: {
       return undefined;
     },
     // 只在启用时执行
-    enabled: options?.enabled,
+    enabled: options?.enabled !== false,
     // 不自动重试，避免过多请求
     retry: false,
   });

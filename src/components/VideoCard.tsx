@@ -1006,8 +1006,8 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(function VideoCard
                 // 正常内容 - 显示播放按钮
                 <PlayCircleIcon
                   size={50}
-                  strokeWidth={0.8}
-                  className='text-white fill-transparent transition-all duration-300 ease-out hover:fill-green-500 hover:scale-[1.1]'
+                  strokeWidth={1.5}
+                  className='text-white fill-transparent transition-all duration-300 ease-out hover:text-green-500 hover:scale-[1.15] drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]'
                   style={{
                     WebkitUserSelect: 'none',
                     userSelect: 'none',

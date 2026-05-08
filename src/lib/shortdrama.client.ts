@@ -21,7 +21,7 @@ const SHORTDRAMA_API_BASE = 'https://wwzy.tv/api.php/provide/vod';
 
 // 检测是否为移动端环境
 const isMobile = () => {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 

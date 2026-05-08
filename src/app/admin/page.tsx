@@ -3657,7 +3657,7 @@ const VideoSourceConfig = ({
       const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
       if (exportFormat === 'array') {
-        // 数组格式：[{name, key, api, detail, disabled, is_adult}]
+        // 数组格式：[{name, key, api, detail, disabled, is_adult, type, weight}]
         exportData = sourcesToExport.map((source) => ({
           name: source.name,
           key: source.key,
@@ -3665,10 +3665,12 @@ const VideoSourceConfig = ({
           detail: source.detail || '',
           disabled: source.disabled || false,
           is_adult: source.is_adult || false,
+          type: source.type || 'vod',
+          weight: source.weight ?? 50,
         }));
         filename = `video_sources_${timestamp}.json`;
       } else {
-        // 配置文件格式：{"api_site": {"key": {name, api, detail?, is_adult?}}}
+        // 配置文件格式：{"api_site": {"key": {name, api, detail?, is_adult?, type?, weight?}}}
         exportData = { api_site: {} };
         sourcesToExport.forEach((source) => {
           const sourceData: any = {
@@ -3681,6 +3683,12 @@ const VideoSourceConfig = ({
           }
           if (source.is_adult) {
             sourceData.is_adult = source.is_adult;
+          }
+          if (source.type && source.type !== 'vod') {
+            sourceData.type = source.type;
+          }
+          if (source.weight !== undefined && source.weight !== 50) {
+            sourceData.weight = source.weight;
           }
           exportData.api_site[source.key] = sourceData;
         });
@@ -3788,6 +3796,8 @@ const VideoSourceConfig = ({
             api: item.api,
             detail: item.detail || '',
             is_adult: item.is_adult || false,
+            type: item.type || 'vod',
+            weight: item.weight ?? 50,
           });
 
           result.success++;
