@@ -8005,7 +8005,7 @@ function AdminPageClient() {
                 isExpanded={expandedTabs.trustedNetworkConfig}
                 onToggle={() => toggleTab('trustedNetworkConfig')}
               >
-                <TrustedNetworkConfig config={config} refreshConfig={fetchConfig} />
+                <TrustedNetworkConfig />
               </CollapsibleTab>
             )}
 
