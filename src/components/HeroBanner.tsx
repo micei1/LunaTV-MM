@@ -204,6 +204,8 @@ function HeroBanner({
   // 预加载背景图片（只预加载当前和后一个，优化性能）
   useEffect(() => {
     // 预加载当前、后一张
+    if (typeof window === 'undefined') return; // SSR环境跳过
+
     const indicesToPreload = [
       currentIndex,
       (currentIndex + 1) % items.length,

@@ -19,7 +19,7 @@ import { Film, Popcorn, Star, Sparkles } from 'lucide-react';
  */
 
 const loadingMessages = [
-  { icon: Film, text: '正在为您准备今晚的观影清单...', emoji: '🎬' },
+  { icon: Film, text: '正在为您准备观影清单...', emoji: '🎬' },
   { icon: Popcorn, text: '爆米花准备好了吗？', emoji: '🍿' },
   { icon: Star, text: '发现了数百部精彩影片...', emoji: '⭐' },
   { icon: Sparkles, text: '正在寻找最适合您的推荐...', emoji: '✨' },

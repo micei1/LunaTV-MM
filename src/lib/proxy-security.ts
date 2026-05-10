@@ -1,5 +1,57 @@
-import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+import CacheableLookup from 'cacheable-lookup';
+
+// 创建全局 DNS 缓存实例（带 TTL 支持）
+const cacheable = new CacheableLookup({
+  maxTtl: 300, // 最大缓存 5 分钟
+  errorTtl: 0.15, // 错误缓存 0.15 秒（快速重试）
+});
+
+/**
+ * DNS 查询重试机制（指数退避）
+ * 解决 EAI_AGAIN 临时性 DNS 失败问题
+ */
+async function lookupWithRetry(
+  hostname: string,
+  options: any,
+  maxRetries = 3,
+  initialDelay = 500
+): Promise<any[]> {
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // 使用 cacheable-lookup 的 lookupAsync 方法
+      const result = await cacheable.lookupAsync(hostname, options);
+
+      // 转换为数组格式（兼容原 lookup 返回格式）
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return [result];
+    } catch (error: any) {
+      lastError = error;
+
+      // 只对临时性错误重试
+      const isRetryable =
+        error.code === 'EAI_AGAIN' ||
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ETIMEDOUT';
+
+      if (isRetryable && i < maxRetries - 1) {
+        // 指数退避：500ms, 1000ms, 2000ms
+        const delay = initialDelay * Math.pow(2, i);
+        console.warn(`[DNS] Retry ${i + 1}/${maxRetries} for ${hostname} after ${delay}ms (error: ${error.code})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError;
+}
 
 export function normalizeHeaderUrl(
   value: string | null | undefined,
@@ -125,7 +177,8 @@ export async function validateProxyTargetUrl(rawUrl: string): Promise<string> {
     return parsed.toString();
   }
 
-  const records = await lookup(hostname, { all: true, verbatim: true });
+  // 使用带重试机制的 DNS 查询（cacheable-lookup + 指数退避）
+  const records = await lookupWithRetry(hostname, { all: true, verbatim: true });
   if (!records.length) throw new Error('Host did not resolve');
 
   if (records.some((record) => isBlockedAddress(record.address))) {

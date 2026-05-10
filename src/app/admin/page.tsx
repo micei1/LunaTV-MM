@@ -51,7 +51,7 @@ import { pinyin } from 'pinyin-pro';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { AdminConfig, AdminConfigResult } from '@/lib/admin.types';
+import { AdminConfig, AdminConfigResult, DEFAULT_CRON_CONFIG } from '@/lib/admin.types';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
 import AIRecommendConfig from '@/components/AIRecommendConfig';
@@ -5227,13 +5227,7 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   });
 
   // Cron 配置状态
-  const [cronSettings, setCronSettings] = useState<CronConfig>({
-    enableAutoRefresh: true,
-    maxRecordsPerRun: 100,
-    onlyRefreshRecent: true,
-    recentDays: 30,
-    onlyRefreshOngoing: true,
-  });
+  const [cronSettings, setCronSettings] = useState<CronConfig>(DEFAULT_CRON_CONFIG);
 
   // 豆瓣数据源相关状态
   const [isDoubanDropdownOpen, setIsDoubanDropdownOpen] = useState(false);
@@ -5312,11 +5306,11 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   useEffect(() => {
     if (config?.CronConfig) {
       setCronSettings({
-        enableAutoRefresh: config.CronConfig.enableAutoRefresh ?? true,
-        maxRecordsPerRun: config.CronConfig.maxRecordsPerRun ?? 100,
-        onlyRefreshRecent: config.CronConfig.onlyRefreshRecent ?? true,
-        recentDays: config.CronConfig.recentDays ?? 30,
-        onlyRefreshOngoing: config.CronConfig.onlyRefreshOngoing ?? true,
+        enableAutoRefresh: config.CronConfig.enableAutoRefresh ?? DEFAULT_CRON_CONFIG.enableAutoRefresh,
+        maxRecordsPerRun: config.CronConfig.maxRecordsPerRun ?? DEFAULT_CRON_CONFIG.maxRecordsPerRun,
+        onlyRefreshRecent: config.CronConfig.onlyRefreshRecent ?? DEFAULT_CRON_CONFIG.onlyRefreshRecent,
+        recentDays: config.CronConfig.recentDays ?? DEFAULT_CRON_CONFIG.recentDays,
+        onlyRefreshOngoing: config.CronConfig.onlyRefreshOngoing ?? DEFAULT_CRON_CONFIG.onlyRefreshOngoing,
       });
     }
   }, [config]);

@@ -19,19 +19,20 @@ export function cn(...inputs: ClassValue[]) {
 const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
 
 // iOS 设备检测 (包括 iPad 的新版本检测)
-const isIOS = /iPad|iPhone|iPod/i.test(userAgent) && !(window as any).MSStream;
+const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/i.test(userAgent) && !(window as any).MSStream;
 const isIOS13Plus = isIOS || (
-  userAgent.includes('Macintosh') && 
-  typeof navigator !== 'undefined' && 
+  typeof window !== 'undefined' &&
+  userAgent.includes('Macintosh') &&
+  typeof navigator !== 'undefined' &&
   navigator.maxTouchPoints >= 1
 );
 
 // iPad 专门检测 (包括新的 iPad Pro)
-const isIPad = /iPad/i.test(userAgent) || (
-  userAgent.includes('Macintosh') && 
-  typeof navigator !== 'undefined' && 
+const isIPad = typeof window !== 'undefined' && (/iPad/i.test(userAgent) || (
+  userAgent.includes('Macintosh') &&
+  typeof navigator !== 'undefined' &&
   navigator.maxTouchPoints > 2
-);
+));
 
 // Android 设备检测
 const isAndroid = /Android/i.test(userAgent);
@@ -40,8 +41,8 @@ const isAndroid = /Android/i.test(userAgent);
 const isMobile = isIOS13Plus || isAndroid || /webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
 
 // 平板设备检测
-const isTablet = isIPad || (isAndroid && !/Mobile/i.test(userAgent)) || 
-  (typeof screen !== 'undefined' && screen.width >= 768);
+const isTablet = isIPad || (isAndroid && !/Mobile/i.test(userAgent)) ||
+  (typeof window !== 'undefined' && typeof screen !== 'undefined' && screen.width >= 768);
 
 // Safari 浏览器检测 (更精确)
 const isSafari = /^(?:(?!chrome|android).)*safari/i.test(userAgent) && !isAndroid;
@@ -52,10 +53,10 @@ const isWebKit = /WebKit/i.test(userAgent);
 // 设备性能等级估算
 const getDevicePerformanceLevel = (): 'low' | 'medium' | 'high' => {
   if (typeof navigator === 'undefined') return 'medium';
-  
+
   // 基于硬件并发数判断
   const cores = navigator.hardwareConcurrency || 4;
-  
+
   if (isMobile) {
     return cores >= 6 ? 'medium' : 'low';
   } else {
@@ -63,7 +64,7 @@ const getDevicePerformanceLevel = (): 'low' | 'medium' | 'high' => {
   }
 };
 
-const devicePerformance = getDevicePerformanceLevel();
+const devicePerformance = typeof window !== 'undefined' ? getDevicePerformanceLevel() : 'medium';
 
 // 导出设备检测结果供其他模块使用
 export {
@@ -193,9 +194,15 @@ export function formatVideoLoadSpeed(speedKBps?: number): string {
 /**
  * 从m3u8地址获取视频质量等级和网络信息
  * @param m3u8Url m3u8播放列表的URL
+ * @param options 配置选项
+ * @param options.timeoutMs 超时时间（毫秒），默认 5000ms
  * @returns Promise<VideoSourceTestResult> 视频质量等级和网络信息（向后兼容）
  */
-export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<VideoSourceTestResult> {
+export async function getVideoResolutionFromM3u8(
+  m3u8Url: string,
+  options: { timeoutMs?: number } = {}
+): Promise<VideoSourceTestResult> {
+  const { timeoutMs = 5000 } = options;
   try {
     // 检测是否为iPad（无论什么浏览器）
     const isIPad = /iPad/i.test(userAgent);
@@ -322,11 +329,10 @@ export async function getVideoResolutionFromM3u8(m3u8Url: string): Promise<Video
 
       const hls = new Hls(hlsConfig);
 
-      const timeoutDuration = isMobile ? 3000 : 4000;
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error('Timeout loading video metadata'));
-      }, timeoutDuration);
+      }, timeoutMs);
 
       const cleanup = () => {
         clearTimeout(timeout);
