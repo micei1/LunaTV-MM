@@ -2532,7 +2532,7 @@ function PlayPageClient() {
       }
 
       // 清理
-      if (websrRef.current.canvas && websrRef.current.canvas.parentNode) {
+      if (websrRef.current.canvas && websrRef.current.canvas.parentNode?.contains(websrRef.current.canvas)) {
         websrRef.current.canvas.parentNode.removeChild(websrRef.current.canvas);
       }
       if (artPlayerRef.current?.video) {
@@ -2557,7 +2557,7 @@ function PlayPageClient() {
         ref.instance = null;
       }
 
-      if (ref.canvas && ref.canvas.parentNode) {
+      if (ref.canvas && ref.canvas.parentNode?.contains(ref.canvas)) {
         ref.canvas.parentNode.removeChild(ref.canvas);
         ref.canvas = null;
       }
