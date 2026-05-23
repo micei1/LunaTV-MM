@@ -11,6 +11,7 @@ import './globals.css';
 import { getConfig } from '@/lib/config';
 
 import { GlobalErrorIndicator } from '../components/GlobalErrorIndicator';
+import { ChunkErrorGuard } from '../components/ChunkErrorGuard';
 import NavigationShell from '../components/NavigationShell';
 import { SessionTracker } from '../components/SessionTracker';
 import { SiteProvider } from '../components/SiteProvider';
@@ -161,6 +162,7 @@ export default async function RootLayout({
               <DownloadProvider>
                 <WatchRoomProvider>
                   <SiteProvider siteName={siteName} announcement={announcement}>
+                    <ChunkErrorGuard />
                     <SessionTracker />
                     <RouteWarmup />
                     {/* 导航栏在 layout 层，自动持久化 */}

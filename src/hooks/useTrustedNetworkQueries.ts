@@ -24,6 +24,7 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 export interface TrustedNetworkConfig {
   enabled: boolean;
   trustedIPs: string[];
+  blockAdminAccess?: boolean;
 }
 
 export interface TrustedNetworkResponse {
