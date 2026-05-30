@@ -41,6 +41,7 @@ import DanmuSettingsPanel from '@/components/play/DanmuSettingsPanel';
 import WebSRSettingsPanel from '@/components/play/WebSRSettingsPanel';
 import { SeekButtonsSettingsPanel } from '@/components/play/SeekButtonsSettingsPanel';
 import artplayerPluginChromecast from '@/lib/artplayer-plugin-chromecast';
+import artplayerPluginAutoThumbnail from '@/lib/artplayer-plugin-auto-thumbnail';
 import artplayerPluginLiquidGlass from '@/lib/artplayer-plugin-liquid-glass';
 import artplayerPluginSeekButtons from '@/lib/artplayer-plugin-seek-buttons';
 import { ClientCache } from '@/lib/client-cache';
@@ -687,6 +688,24 @@ function PlayPageClient() {
     `;
   }, [currentEpisodeIndex, detail, portalContainer]);
 
+  // 全屏实时时钟 — 每秒更新一次
+  useEffect(() => {
+    const updateClock = () => {
+      if (!artPlayerRef.current) return;
+      const clockLayer = artPlayerRef.current.layers['fullscreen-clock'];
+      if (!clockLayer) return;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      clockLayer.innerHTML = `<span class="fullscreen-clock">${hh}:${mm}:${ss}</span>`;
+    };
+
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // 获取自定义去广告代码
   useEffect(() => {
     const fetchAdFilterCode = async () => {
@@ -901,6 +920,8 @@ function PlayPageClient() {
   const lastVolumeRef = useRef<number>(0.7);
   // 上次使用的播放速率，从 localStorage 恢复
   const lastPlaybackRateRef = useRef<number>(loadPlaybackRate());
+  // 🔥 修复：标记是否正在切换源/集数，用于阻止 ratechange 保存瞬态的播放速率重置
+  const isSourceSwitchingRef = useRef(false);
 
   const [sourceSearchLoading, setSourceSearchLoading] = useState(false);
   const [sourceSearchError, setSourceSearchError] = useState<string | null>(
@@ -4196,6 +4217,9 @@ function PlayPageClient() {
         const savedPlaybackRate = loadPlaybackRate();
         lastPlaybackRateRef.current = savedPlaybackRate;
 
+          // 🔥 修复：标记切换中，阻止 video:ratechange 将浏览器重置的 1.0 保存到 localStorage
+          isSourceSwitchingRef.current = true;
+
         let switchPromise: Promise<any>;
         if (isEpisodeChange) {
           console.log(`🎯 开始切换集数: ${videoUrl} (重置播放时间到0)`);
@@ -4242,6 +4266,8 @@ function PlayPageClient() {
           artPlayerRef.current.playbackRate = savedPlaybackRate;
           console.log(`✅ 恢复播放速率: ${savedPlaybackRate}x`);
         }
+          // 🔥 修复：切换完成，恢复 ratechange 的正常保存行为
+          isSourceSwitchingRef.current = false;
 
         if (artPlayerRef.current?.video) {
           ensureVideoSource(
@@ -4961,6 +4987,11 @@ function PlayPageClient() {
           // 毛玻璃效果控制栏插件 - 现代化悬浮设计
           // CSS已优化：桌面98%宽度，移动端100%，按钮可自动缩小适应
           artplayerPluginLiquidGlass(),
+          artplayerPluginAutoThumbnail({
+            width: 160,
+            number: 100,
+            scale: 1,
+          }),
           // 快进/快退按钮插件 - 在控制栏添加 ±10秒 按钮
           artplayerPluginSeekButtons({
             seekTime: parseInt(localStorage.getItem('seek_time') || '10', 10),
@@ -5047,6 +5078,22 @@ function PlayPageClient() {
             zIndex: '20',
           },
         });
+
+          // 全屏实时时钟层（右上角）
+          artPlayerRef.current.layers.add({
+            name: 'fullscreen-clock',
+            html: '<span class="fullscreen-clock">--:--:--</span>',
+            style: {
+              position: 'absolute',
+              top: '0',
+              right: '24px',
+              height: '80px',
+              display: 'none',
+              pointerEvents: 'none',
+              zIndex: '21',
+              alignItems: 'center',
+            },
+          });
 
         // 自动隐藏徽章的定时器
         let badgeHideTimer: NodeJS.Timeout | null = null;
@@ -5600,6 +5647,14 @@ function PlayPageClient() {
         lastVolumeRef.current = artPlayerRef.current.volume;
       });
       artPlayerRef.current.on('video:ratechange', () => {
+          // 🔥 修复：切换源/集数时，浏览器会重置 playbackRate 到 1.0 并触发 ratechange，
+          // 此时保存会覆盖用户设置的倍速。跳过这个瞬态事件。
+          if (isSourceSwitchingRef.current) {
+            console.log(
+              `⏭️ 忽略切换中的 ratechange: ${artPlayerRef.current.playbackRate}`,
+            );
+            return;
+          }
         lastPlaybackRateRef.current = sanitizePlaybackRate(
           artPlayerRef.current.playbackRate,
         );
@@ -5619,6 +5674,10 @@ function PlayPageClient() {
         if (titleLayer) {
           titleLayer.style.display = isFullscreen ? 'block' : 'none';
         }
+          const clockLayer = artPlayerRef.current?.layers['fullscreen-clock'];
+          if (clockLayer) {
+            clockLayer.style.display = isFullscreen ? 'flex' : 'none';
+          }
 
         // 应用保存的透明度设置
         const liquidGlass = artPlayerRef.current?.template?.$player?.querySelector('.art-liquid-glass') as HTMLElement | null;
@@ -5658,6 +5717,10 @@ function PlayPageClient() {
         if (titleLayer) {
           titleLayer.style.display = isFullscreenWeb ? 'block' : 'none';
         }
+          const clockLayer = artPlayerRef.current?.layers['fullscreen-clock'];
+          if (clockLayer) {
+            clockLayer.style.display = isFullscreenWeb ? 'flex' : 'none';
+          }
       });
 
       // 监听视频可播放事件，这时恢复播放进度更可靠
@@ -5776,18 +5839,19 @@ function PlayPageClient() {
 
         setTimeout(() => {
           if (
-            Math.abs(artPlayerRef.current.volume - lastVolumeRef.current) > 0.01
+            Math.abs(artPlayerRef.current.volume - lastVolumeRef.current) >
+            0.01
           ) {
             artPlayerRef.current.volume = lastVolumeRef.current;
           }
-          if (
-            Math.abs(
-              artPlayerRef.current.playbackRate - lastPlaybackRateRef.current
-            ) > 0.01
-          ) {
-            artPlayerRef.current.playbackRate = lastPlaybackRateRef.current;
-          }
-          artPlayerRef.current.notice.show = '';
+            // 🔥 修复：优先从 localStorage 恢复播放速率（防止 ref 被切换中的 ratechange 污染）
+            const targetRate = loadPlaybackRate();
+            if (
+              Math.abs(artPlayerRef.current.playbackRate - targetRate) > 0.01
+            ) {
+              artPlayerRef.current.playbackRate = targetRate;
+            }
+            artPlayerRef.current.notice.show = '';
         }, 0);
 
         // 隐藏换源加载状态
@@ -6158,6 +6222,8 @@ function PlayPageClient() {
                     source={currentSource}
                     id={currentId}
                     title={detail.title}
+                    doubanId={videoDoubanId}
+                    year={videoYear}
                     episodeIndex={currentEpisodeIndex}
                     artPlayerRef={artPlayerRef}
                     currentTime={currentPlayTime}

@@ -20,7 +20,8 @@ const PageLayout = ({
 }: PageLayoutProps) => {
   if (useModernNav) {
     // Modern layout - 只返回内容，导航栏由 NavigationShell 处理
-    return <>{children}</>;
+    // translate="no" 阻止浏览器翻译插件修改 DOM 导致 React reconciler 崩溃
+    return <div translate="no">{children}</div>;
   }
 
   // Legacy Sidebar Layout (原来的设计)

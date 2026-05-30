@@ -326,6 +326,9 @@ interface SiteConfig {
   TMDBApiKey?: string;
   TMDBLanguage?: string;
   EnableTMDBActorSearch?: boolean;
+  // Bangumi API 代理
+  BangumiApiType?: string;
+  BangumiApiProxy?: string;
 }
 
 // Cron 配置类型
@@ -5231,6 +5234,8 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
     DoubanProxy: '',
     DoubanImageProxyType: 'direct',
     DoubanImageProxy: '',
+    BangumiApiType: 'server',
+    BangumiApiProxy: '',
     EnablePuppeteer: false, // 默认关闭 Puppeteer
     DoubanCookies: '', // 默认无 Cookies
     DisableYellowFilter: false,
@@ -5250,6 +5255,7 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   const [isDoubanDropdownOpen, setIsDoubanDropdownOpen] = useState(false);
   const [isDoubanImageProxyDropdownOpen, setIsDoubanImageProxyDropdownOpen] =
     useState(false);
+  const [isBangumiApiDropdownOpen, setIsBangumiApiDropdownOpen] = useState(false);
 
   // 豆瓣数据源选项
   const doubanDataSourceOptions = [
@@ -5260,7 +5266,15 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
       label: '豆瓣 CDN By CMLiussss（腾讯云）',
     },
     { value: 'cmliussss-cdn-ali', label: '豆瓣 CDN By CMLiussss（阿里云）' },
+    { value: 'cmliussss-unified', label: '豆瓣 CDN By CMLiussss（统一域名）' },
     { value: 'custom', label: '自定义代理' },
+  ];
+
+  // Bangumi API 代理选项
+  const bangumiApiTypeOptions = [
+    { value: 'server', label: '服务端转发（默认，访问官方 api.bgm.tv）' },
+    { value: 'cmliussss', label: 'Bangumi 反代 By CMLiussss（解决服务器被墙）' },
+    { value: 'custom', label: '自定义反代地址' },
   ];
 
   // 豆瓣图片代理选项
@@ -5287,6 +5301,7 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         };
       case 'cmliussss-cdn-tencent':
       case 'cmliussss-cdn-ali':
+      case 'cmliussss-unified':
         return {
           text: 'Thanks to @CMLiussss',
           url: 'https://github.com/cmliu',
@@ -5305,6 +5320,8 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         DoubanImageProxyType:
           config.SiteConfig.DoubanImageProxyType || 'direct',
         DoubanImageProxy: config.SiteConfig.DoubanImageProxy || '',
+        BangumiApiType: config.SiteConfig.BangumiApiType || 'server',
+        BangumiApiProxy: config.SiteConfig.BangumiApiProxy || '',
         EnablePuppeteer: config.DoubanConfig?.enablePuppeteer || false,
         DoubanCookies: config.DoubanConfig?.cookies || '',
         DisableYellowFilter: config.SiteConfig.DisableYellowFilter || false,
@@ -5684,6 +5701,79 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
             />
             <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
               自定义图片代理服务器地址
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Bangumi API 代理设置 */}
+      <div className='space-y-3'>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Bangumi 数据代理
+          </label>
+          <div className='relative' data-dropdown='bangumi-api'>
+            <button
+              type='button'
+              onClick={() => setIsBangumiApiDropdownOpen(!isBangumiApiDropdownOpen)}
+              className="w-full px-3 py-2.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm hover:border-gray-400 dark:hover:border-gray-500 text-left"
+            >
+              {bangumiApiTypeOptions.find(o => o.value === siteSettings.BangumiApiType)?.label}
+            </button>
+            <div className='absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none'>
+              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${isBangumiApiDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+            {isBangumiApiDropdownOpen && (
+              <div className='absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto'>
+                {bangumiApiTypeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type='button'
+                    onClick={() => {
+                      setSiteSettings(prev => ({ ...prev, BangumiApiType: option.value }));
+                      setIsBangumiApiDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 text-left text-sm transition-colors duration-150 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 ${siteSettings.BangumiApiType === option.value ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}
+                  >
+                    <span className='truncate'>{option.label}</span>
+                    {siteSettings.BangumiApiType === option.value && (
+                      <Check className='w-4 h-4 text-green-600 dark:text-green-400 shrink-0 ml-2' />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+            选择获取 Bangumi 番剧数据的方式，服务器无法访问 api.bgm.tv 时可切换反代
+          </p>
+          {siteSettings.BangumiApiType === 'cmliussss' && (
+            <div className='mt-3'>
+              <button
+                type='button'
+                onClick={() => window.open('https://github.com/cmliu', '_blank')}
+                className='flex items-center justify-center gap-1.5 w-full px-3 text-xs text-gray-500 dark:text-gray-400 cursor-pointer'
+              >
+                <span className='font-medium'>Thanks to @CMLiussss</span>
+                <ExternalLink className='w-3.5 opacity-70' />
+              </button>
+            </div>
+          )}
+        </div>
+        {siteSettings.BangumiApiType === 'custom' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Bangumi 反代地址
+            </label>
+            <input
+              type='text'
+              placeholder='例如: https://bgm-proxy.example.com'
+              value={siteSettings.BangumiApiProxy || ''}
+              onChange={(e) => setSiteSettings(prev => ({ ...prev, BangumiApiProxy: e.target.value }))}
+              className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+            />
+            <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+              与官方 api.bgm.tv 路径兼容的反代地址，不含末尾斜杠
             </p>
           </div>
         )}

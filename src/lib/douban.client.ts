@@ -285,6 +285,7 @@ function getDoubanProxyConfig(): {
   | 'cors-proxy-zwei'
   | 'cmliussss-cdn-tencent'
   | 'cmliussss-cdn-ali'
+  | 'cmliussss-unified'
   | 'cors-anywhere'
   | 'custom';
   proxyUrl: string;
@@ -310,7 +311,8 @@ export async function fetchDoubanCategories(
   params: DoubanCategoriesParams,
   proxyUrl: string,
   useTencentCDN = false,
-  useAliCDN = false
+  useAliCDN = false,
+  useUnified = false
 ): Promise<DoubanResult> {
   const { kind, category, type, pageLimit = 20, pageStart = 0 } = params;
 
@@ -331,16 +333,18 @@ export async function fetchDoubanCategories(
     throw new Error('pageStart 不能小于 0');
   }
 
-  const target = useTencentCDN
-    ? `https://m.douban.cmliussss.net/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`
-    : useAliCDN
-      ? `https://m.douban.cmliussss.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`
-      : `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`;
+  const target = useUnified
+    ? `https://img.doubanio.cmliussss.net/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`
+    : useTencentCDN
+      ? `https://m.douban.cmliussss.net/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`
+      : useAliCDN
+        ? `https://m.douban.cmliussss.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`
+        : `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`;
 
   try {
     const response = await fetchWithTimeout(
       target,
-      useTencentCDN || useAliCDN ? '' : proxyUrl
+      useUnified || useTencentCDN || useAliCDN ? '' : proxyUrl
     );
 
     if (!response.ok) {
@@ -419,6 +423,9 @@ export async function getDoubanCategories(
       break;
     case 'cmliussss-cdn-ali':
       result = await fetchDoubanCategories(params, '', false, true);
+      break;
+    case 'cmliussss-unified':
+      result = await fetchDoubanCategories(params, '', false, false, true);
       break;
     case 'cors-anywhere':
       result = await fetchDoubanCategories(params, 'https://cors-anywhere.com/');
@@ -502,6 +509,9 @@ export async function getDoubanList(
         case 'cmliussss-cdn-ali':
           result = await fetchDoubanList(params, '', false, true);
           break;
+        case 'cmliussss-unified':
+          result = await fetchDoubanList(params, '', false, false, true);
+          break;
         case 'cors-anywhere':
           result = await fetchDoubanList(params, 'https://cors-anywhere.com/');
           break;
@@ -542,7 +552,8 @@ export async function fetchDoubanList(
   params: DoubanListParams,
   proxyUrl: string,
   useTencentCDN = false,
-  useAliCDN = false
+  useAliCDN = false,
+  useUnified = false
 ): Promise<DoubanResult> {
   const { tag, type, pageLimit = 20, pageStart = 0 } = params;
 
@@ -563,16 +574,18 @@ export async function fetchDoubanList(
     throw new Error('pageStart 不能小于 0');
   }
 
-  const target = useTencentCDN
-    ? `https://movie.douban.cmliussss.net/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`
-    : useAliCDN
-      ? `https://movie.douban.cmliussss.com/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`
-      : `https://movie.douban.com/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
+  const target = useUnified
+    ? `https://img.doubanio.cmliussss.net/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`
+    : useTencentCDN
+      ? `https://movie.douban.cmliussss.net/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`
+      : useAliCDN
+        ? `https://movie.douban.cmliussss.com/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`
+        : `https://movie.douban.com/j/search_subjects?type=${type}&tag=${tag}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
 
   try {
     const response = await fetchWithTimeout(
       target,
-      useTencentCDN || useAliCDN ? '' : proxyUrl
+      useUnified || useTencentCDN || useAliCDN ? '' : proxyUrl
     );
 
     if (!response.ok) {
@@ -674,6 +687,9 @@ export async function getDoubanRecommends(
       break;
     case 'cmliussss-cdn-ali':
       result = await fetchDoubanRecommends(params, '', false, true);
+      break;
+    case 'cmliussss-unified':
+      result = await fetchDoubanRecommends(params, '', false, false, true);
       break;
     case 'cors-anywhere':
       result = await fetchDoubanRecommends(params, 'https://cors-anywhere.com/');
@@ -785,7 +801,8 @@ async function fetchDoubanRecommends(
   params: DoubanRecommendsParams,
   proxyUrl: string,
   useTencentCDN = false,
-  useAliCDN = false
+  useAliCDN = false,
+  useUnified = false
 ): Promise<DoubanResult> {
   const { kind, pageLimit = 20, pageStart = 0 } = params;
   let { category, format, region, year, platform, sort, label } = params;
@@ -839,11 +856,13 @@ async function fetchDoubanRecommends(
     tags.push(platform);
   }
 
-  const baseUrl = useTencentCDN
-    ? `https://m.douban.cmliussss.net/rexxar/api/v2/${kind}/recommend`
-    : useAliCDN
-      ? `https://m.douban.cmliussss.com/rexxar/api/v2/${kind}/recommend`
-      : `https://m.douban.com/rexxar/api/v2/${kind}/recommend`;
+  const baseUrl = useUnified
+    ? `https://img.doubanio.cmliussss.net/rexxar/api/v2/${kind}/recommend`
+    : useTencentCDN
+      ? `https://m.douban.cmliussss.net/rexxar/api/v2/${kind}/recommend`
+      : useAliCDN
+        ? `https://m.douban.cmliussss.com/rexxar/api/v2/${kind}/recommend`
+        : `https://m.douban.com/rexxar/api/v2/${kind}/recommend`;
   const reqParams = new URLSearchParams();
   reqParams.append('refresh', '0');
   reqParams.append('start', pageStart.toString());

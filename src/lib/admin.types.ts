@@ -22,6 +22,9 @@ export interface AdminConfig {
     TMDBApiKey?: string;
     TMDBLanguage?: string;
     EnableTMDBActorSearch?: boolean;
+    // Bangumi API 代理
+    BangumiApiType?: string;
+    BangumiApiProxy?: string;
     // 自定义去广告代码
     CustomAdFilterCode?: string;
     CustomAdFilterVersion?: number;

@@ -2272,6 +2272,7 @@ function SearchPageClient() {
                       className='grid-cols-3 gap-x-2 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,_minmax(11rem,_1fr))] sm:gap-x-8'
                       rowGapClass='pb-14 sm:pb-20'
                       estimateRowHeight={320}
+                      restoreKey={`search:agg:${searchQuery.trim()}`}
                       renderItem={([mapKey, group]) => {
                         const title = group[0]?.title || '';
                         const poster = group[0]?.poster || '';
@@ -2306,6 +2307,7 @@ function SearchPageClient() {
                       className='grid-cols-3 gap-x-2 px-0 sm:px-2 sm:grid-cols-[repeat(auto-fill,_minmax(11rem,_1fr))] sm:gap-x-8'
                       rowGapClass='pb-14 sm:pb-20'
                       estimateRowHeight={320}
+                      restoreKey={`search:all:${searchQuery.trim()}`}
                       renderItem={(item) => (
                         <div key={`all-${item.source}-${item.id}`} className='w-full'>
                           <VideoCard
