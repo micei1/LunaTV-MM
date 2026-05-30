@@ -30,7 +30,7 @@ import NetDiskButton from '@/components/play/NetDiskButton';
 import CollapseButton from '@/components/play/CollapseButton';
 import BackToTopButton from '@/components/play/BackToTopButton';
 import LoadingScreen from '@/components/play/LoadingScreen';
-import VideoInfoSection from '@/components/play/VideoInfoSection';
+import PlayInfoPanel from '@/components/play/PlayInfoPanel';
 import VideoLoadingOverlay from '@/components/play/VideoLoadingOverlay';
 import WatchRoomSyncBanner from '@/components/play/WatchRoomSyncBanner';
 import SourceSwitchDialog from '@/components/play/SourceSwitchDialog';
@@ -493,6 +493,34 @@ function PlayPageClient() {
   // 兼容旧代码的 loading 状态
   const loadingMovieDetails = movieDetailsStatus === 'pending';
   const loadingComments = commentsStatus === 'pending';
+
+  // TMDB 数据（backdrop + poster + logo + title + overview + rating）
+  const [tmdbData, setTmdbData] = useState<{
+    backdrop: string | null;
+    poster: string | null;
+    logo: string | null;
+    title: string | null;
+    overview: string | null;
+    rating: number | null;
+    year: string | null;
+    numberOfSeasons: number | null;
+  } | null>(null);
+  const tmdbFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!videoTitle) return;
+    if (tmdbFetchedRef.current) return;
+    tmdbFetchedRef.current = true;
+    let cancelled = false;
+    const params = new URLSearchParams({ title: videoTitle });
+    if (videoYear) params.set('year', videoYear);
+    if (movieDetails?.original_title) params.set('original_title', movieDetails.original_title);
+    if (searchType) params.set('stype', searchType);
+    fetch(`/api/tmdb/backdrop?${params.toString()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (!cancelled && json?.data) setTmdbData(json.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [videoTitle, videoYear, movieDetails?.original_title]);
 
   // 当前源和ID
   const [currentSource, setCurrentSource] = useState(
@@ -6105,8 +6133,8 @@ function PlayPageClient() {
     <>
       <PageLayout activePath='/play'>
       <div className='flex flex-col gap-3 py-4 px-5 lg:px-[3rem] 2xl:px-20 pb-40 md:pb-safe-bottom'>
-        {/* 第一行：影片标题 */}
-        <div className='py-1'>
+        {/* 第一行：影片标题（小屏幕用，大屏幕在 PlayInfoPanel 里） */}
+        <div className='py-1 lg:hidden'>
           <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
             {videoTitle || '影片标题'}
             {totalEpisodes > 1 && (
@@ -6286,45 +6314,42 @@ function PlayPageClient() {
         </div>
 
         {/* 详情展示 */}
-        <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-          {/* 文字区 - 使用独立组件优化性能 */}
-          <VideoInfoSection
-            videoTitle={videoTitle}
-            videoYear={videoYear}
-            videoCover={videoCover}
-            videoDoubanId={videoDoubanId}
-            currentSource={currentSource}
-            favorited={favorited}
-            onToggleFavorite={handleToggleFavorite}
-            detail={detail}
-            movieDetails={movieDetails}
-            bangumiDetails={bangumiDetails}
-            shortdramaDetails={shortdramaDetails}
-            movieComments={movieComments}
-            commentsError={commentsError?.message || null}
-            loadingMovieDetails={loadingMovieDetails}
-            loadingBangumiDetails={loadingBangumiDetails}
-            loadingComments={loadingComments}
-            loadingCelebrityWorks={loadingCelebrityWorks}
-            selectedCelebrityName={selectedCelebrityName}
-            celebrityWorks={celebrityWorks}
-            onCelebrityClick={handleCelebrityClick}
-            onClearCelebrity={() => {
-              setSelectedCelebrityName(null);
-              setCelebrityWorks([]);
-            }}
-            processImageUrl={processImageUrl}
-          />
-
-          {/* 封面展示 */}
-          <VideoCoverDisplay
-            videoCover={videoCover}
-            bangumiDetails={bangumiDetails}
-            videoTitle={videoTitle}
-            videoDoubanId={videoDoubanId}
-            processImageUrl={processImageUrl}
-          />
-        </div>
+        <PlayInfoPanel
+          title={tmdbData?.title || videoTitle}
+          year={tmdbData?.year || videoYear}
+          cover={videoCover}
+          sourceName={detail?.source_name}
+          totalEpisodes={totalEpisodes}
+          currentEpisodeIndex={currentEpisodeIndex}
+          episodeName={detail?.episodes_titles?.[currentEpisodeIndex]}
+          backdropUrl={tmdbData?.backdrop || (movieDetails?.backdrop ? `/api/image-proxy?url=${encodeURIComponent(movieDetails.backdrop)}` : null)}
+          tmdbPoster={tmdbData?.poster}
+          tmdbOverview={tmdbData?.overview}
+          tmdbRating={tmdbData?.rating}
+          tmdbLogo={tmdbData?.logo}
+          tmdbNumberOfSeasons={tmdbData?.numberOfSeasons}
+          favorited={favorited}
+          onToggleFavorite={handleToggleFavorite}
+          detail={detail}
+          movieDetails={movieDetails}
+          bangumiDetails={bangumiDetails}
+          shortdramaDetails={shortdramaDetails}
+          movieComments={movieComments}
+          commentsError={commentsError?.message || null}
+          loadingMovieDetails={loadingMovieDetails}
+          loadingBangumiDetails={loadingBangumiDetails}
+          loadingComments={loadingComments}
+          loadingCelebrityWorks={loadingCelebrityWorks}
+          selectedCelebrityName={selectedCelebrityName}
+          celebrityWorks={celebrityWorks}
+          onCelebrityClick={handleCelebrityClick}
+          onClearCelebrity={() => {
+            setSelectedCelebrityName(null);
+            setCelebrityWorks([]);
+          }}
+          videoDoubanId={videoDoubanId}
+          currentSource={currentSource}
+        />
       </div>
 
       {/* 返回顶部悬浮按钮 - 使用独立组件优化性能 */}
