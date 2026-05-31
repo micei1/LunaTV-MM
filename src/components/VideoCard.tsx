@@ -1712,6 +1712,7 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(function VideoCard
         doubanId={actualDoubanId}
         videoTitle={actualTitle}
         videoYear={actualYear}
+        isBangumi={isBangumi}
       />
 
       {/* AI问片弹窗 */}
