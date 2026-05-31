@@ -55,14 +55,57 @@ export async function GetBangumiCalendarData(): Promise<BangumiCalendarData[]> {
     if (cached) return cached;
   } catch {}
 
-  const response = await fetch(buildBangumiProxyUrl('calendar'));
-  const data = await response.json();
-
   try {
-    await ClientCache.set(cacheKey, data, 2 * 60 * 60);
-  } catch {}
+    const response = await fetch(buildBangumiProxyUrl('calendar'));
+    const data = await response.json();
 
-  return data;
+    // Validate response is an array
+    if (Array.isArray(data)) {
+      try {
+        await ClientCache.set(cacheKey, data, 2 * 60 * 60);
+      } catch {}
+      return data;
+    }
+
+    // If not an array, API might be blocked - try fallback
+    console.warn('[Bangumi] Calendar API returned non-array data, attempting fallback to cmliussss proxy');
+    throw new Error('Invalid calendar data format');
+  } catch (error) {
+    // Fallback: try cmliussss proxy if not already using it
+    if (typeof window !== 'undefined') {
+      const currentApiType = localStorage.getItem('bangumiApiType');
+      if (currentApiType !== 'cmliussss') {
+        console.warn('[Bangumi] Falling back to cmliussss proxy due to API error:', error);
+        // Temporarily switch to cmliussss for this request
+        localStorage.setItem('bangumiApiType', 'cmliussss');
+
+        try {
+          const fallbackResponse = await fetch(buildBangumiProxyUrl('calendar'));
+          const fallbackData = await fallbackResponse.json();
+
+          if (Array.isArray(fallbackData)) {
+            console.log('[Bangumi] Fallback to cmliussss proxy succeeded, persisting this choice');
+            try {
+              await ClientCache.set(cacheKey, fallbackData, 2 * 60 * 60);
+            } catch {}
+            return fallbackData;
+          }
+        } catch (fallbackError) {
+          console.error('[Bangumi] Fallback to cmliussss also failed:', fallbackError);
+          // Restore original setting if fallback also failed
+          if (currentApiType) {
+            localStorage.setItem('bangumiApiType', currentApiType);
+          } else {
+            localStorage.removeItem('bangumiApiType');
+          }
+        }
+      }
+    }
+
+    // If all attempts failed, return empty array to prevent crashes
+    console.error('[Bangumi] All attempts to fetch calendar data failed, returning empty array');
+    return [];
+  }
 }
 
 export async function fetchBangumiSubject(id: number): Promise<{
