@@ -97,7 +97,7 @@ async function getRecommendedShortDramasInternal(
     if (shortDramaSources.length === 0) {
       console.log('📺 使用默认短剧源');
       return await fetchFromShortDramaSource(
-        'https://wwzy.tv/api.php/provide/vod',
+        'https://tyyszyapi.com/api.php/provide/vod',
         size
       );
     }
@@ -143,7 +143,7 @@ async function getRecommendedShortDramasInternal(
     try {
       console.log('⚠️ 出错，fallback到默认源');
       return await fetchFromShortDramaSource(
-        'https://wwzy.tv/api.php/provide/vod',
+        'https://tyyszyapi.com/api.php/provide/vod',
         size
       );
     } catch (fallbackError) {
