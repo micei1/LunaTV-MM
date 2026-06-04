@@ -473,12 +473,17 @@ function HeroBanner({
         <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
           {/* 标题 - Netflix风格：超大字体，有 TMDB logo 就显示图片 */}
           {currentItem.tmdbLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={currentItem.tmdbLogo}
-              alt={currentItem.title}
-              className="max-h-20 sm:max-h-24 md:max-h-32 lg:max-h-40 w-auto max-w-[70%] object-contain drop-shadow-2xl"
-            />
+            <div className="relative inline-block max-w-[70%]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={currentItem.tmdbLogo}
+                alt={currentItem.title}
+                className="max-h-16 sm:max-h-20 md:max-h-24 lg:max-h-28 w-auto object-contain"
+                style={{
+                  filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.6)) drop-shadow(0 4px 8px rgba(0,0,0,0.9))',
+                }}
+              />
+            </div>
           ) : (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white drop-shadow-2xl leading-tight break-words">
               {currentItem.title}

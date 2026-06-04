@@ -149,6 +149,9 @@ interface AlertModalProps {
   message?: string;
   timer?: number;
   showConfirm?: boolean;
+  showUndo?: boolean; // 新增：显示撤销按钮
+  onUndo?: () => void; // 新增：撤销回调
+  undoTimer?: number; // 新增：撤销倒计时（毫秒）
 }
 
 const AlertModal = ({
@@ -158,22 +161,62 @@ const AlertModal = ({
   title,
   message,
   timer,
-  showConfirm = false
+  showConfirm = false,
+  showUndo = false,
+  onUndo,
+  undoTimer = 5000,
 }: AlertModalProps) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [isUndone, setIsUndone] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      if (timer) {
-        setTimeout(() => {
+      setIsUndone(false);
+
+      // 如果有撤销功能，启动倒计时
+      if (showUndo && undoTimer) {
+        setCountdown(Math.ceil(undoTimer / 1000));
+        const countdownInterval = setInterval(() => {
+          setCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        const closeTimer = setTimeout(() => {
+          if (!isUndone) {
+            onClose();
+          }
+        }, undoTimer);
+
+        return () => {
+          clearInterval(countdownInterval);
+          clearTimeout(closeTimer);
+        };
+      } else if (timer) {
+        // 普通定时关闭
+        const closeTimer = setTimeout(() => {
           onClose();
         }, timer);
+        return () => clearTimeout(closeTimer);
       }
     } else {
       setIsVisible(false);
     }
-  }, [isOpen, timer, onClose]);
+  }, [isOpen, timer, showUndo, undoTimer, onClose, isUndone]);
+
+  const handleUndo = () => {
+    setIsUndone(true);
+    if (onUndo) {
+      onUndo();
+    }
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -221,7 +264,31 @@ const AlertModal = ({
             </p>
           )}
 
-          {showConfirm && (
+          {/* 撤销按钮和倒计时 */}
+          {showUndo && countdown > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <span>将在 {countdown} 秒后执行</span>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={handleUndo}
+                  className={`px-4 py-2 text-sm font-medium ${buttonStyles.warning}`}
+                >
+                  撤销
+                </button>
+                <button
+                  onClick={onClose}
+                  className={`px-4 py-2 text-sm font-medium ${buttonStyles.secondary}`}
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 普通确认按钮 */}
+          {showConfirm && !showUndo && (
             <button
               onClick={onClose}
               className={`px-4 py-2 text-sm font-medium ${buttonStyles.primary}`}
@@ -245,6 +312,9 @@ const useAlertModal = () => {
     message?: string;
     timer?: number;
     showConfirm?: boolean;
+    showUndo?: boolean;
+    onUndo?: () => void;
+    undoTimer?: number;
   }>({
     isOpen: false,
     type: 'success',
@@ -329,6 +399,9 @@ interface SiteConfig {
   // Bangumi API 代理
   BangumiApiType?: string;
   BangumiApiProxy?: string;
+  // Bangumi 图片代理
+  BangumiImageProxyType?: string;
+  BangumiImageProxy?: string;
 }
 
 // Cron 配置类型
@@ -846,7 +919,8 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
       | 'deleteUser',
     targetUsername: string,
     targetPassword?: string,
-    userGroup?: string
+    userGroup?: string,
+    options?: { skipToast?: boolean } // 新增：支持跳过通知
   ) => {
     try {
       const res = await fetch('/api/admin/user', {
@@ -867,23 +941,66 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
 
       // 成功后刷新配置（无需整页刷新）
       await refreshConfig();
+
+      // 根据操作类型决定是否显示通知
+      // 频繁的切换操作（启用/禁用）默认不显示通知，除非明确要求
+      const silentActions = ['ban', 'unban']; // 频繁操作，默认静默
+      const shouldShowToast = options?.skipToast === false || !silentActions.includes(action);
+
+      if (shouldShowToast) {
+        const actionMessages: Record<string, string> = {
+          add: '用户添加成功',
+          ban: '用户已禁用',
+          unban: '用户已启用',
+          setAdmin: '已设置为管理员',
+          cancelAdmin: '已取消管理员权限',
+          changePassword: '密码修改成功',
+          deleteUser: '用户删除成功',
+        };
+        showSuccess(actionMessages[action] || '操作成功', showAlert);
+      }
     } catch (err) {
       showError(err instanceof Error ? err.message : '操作失败', showAlert);
+      throw err;
     }
   };
 
   const handleConfirmDeleteUser = async () => {
     if (!deletingUser) return;
 
-    await withLoading(`deleteUser_${deletingUser}`, async () => {
-      try {
-        await handleUserAction('deleteUser', deletingUser);
-        setShowDeleteUserModal(false);
-        setDeletingUser(null);
-      } catch (err) {
-        // 错误处理已在 handleUserAction 中处理
-      }
+    // 关闭确认对话框
+    setShowDeleteUserModal(false);
+    const usernameToDelete = deletingUser;
+    setDeletingUser(null);
+
+    // 使用撤销模式：显示带撤销按钮的通知
+    let undoCancelled = false;
+
+    showAlert({
+      type: 'warning',
+      title: '用户删除中',
+      message: `用户 ${usernameToDelete} 将被删除，点击撤销可取消操作`,
+      showUndo: true,
+      undoTimer: 5000,
+      onUndo: () => {
+        undoCancelled = true;
+        showSuccess('已取消删除操作', showAlert);
+      },
     });
+
+    // 5秒后执行真正的删除
+    setTimeout(async () => {
+      if (!undoCancelled) {
+        await withLoading(`deleteUser_${usernameToDelete}`, async () => {
+          try {
+            await handleUserAction('deleteUser', usernameToDelete, undefined, undefined, { skipToast: true });
+            showSuccess(`用户 ${usernameToDelete} 已删除`, showAlert);
+          } catch (err) {
+            // 错误处理已在 handleUserAction 中处理
+          }
+        });
+      }
+    }, 5000);
   };
 
   if (!config) {
@@ -2850,6 +2967,9 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
 
 
@@ -4570,6 +4690,9 @@ const VideoSourceConfig = ({
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
 
       {/* 批量操作确认弹窗 */}
@@ -4981,6 +5104,9 @@ const CategoryConfig = ({
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
     </div>
   );
@@ -5216,6 +5342,9 @@ const ConfigFileComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
     </div>
   );
@@ -5236,6 +5365,8 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
     DoubanImageProxy: '',
     BangumiApiType: 'server',
     BangumiApiProxy: '',
+    BangumiImageProxyType: 'server',
+    BangumiImageProxy: '',
     EnablePuppeteer: false, // 默认关闭 Puppeteer
     DoubanCookies: '', // 默认无 Cookies
     DisableYellowFilter: false,
@@ -5256,6 +5387,7 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
   const [isDoubanImageProxyDropdownOpen, setIsDoubanImageProxyDropdownOpen] =
     useState(false);
   const [isBangumiApiDropdownOpen, setIsBangumiApiDropdownOpen] = useState(false);
+  const [isBangumiImageProxyDropdownOpen, setIsBangumiImageProxyDropdownOpen] = useState(false);
 
   // 豆瓣数据源选项
   const doubanDataSourceOptions = [
@@ -5275,6 +5407,14 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
     { value: 'server', label: '服务端转发（默认，访问官方 api.bgm.tv）' },
     { value: 'cmliussss', label: 'Bangumi 反代 By CMLiussss（解决服务器被墙）' },
     { value: 'custom', label: '自定义反代地址' },
+  ];
+
+  // Bangumi 图片代理选项
+  const bangumiImageProxyTypeOptions = [
+    { value: 'server', label: '服务器代理（默认，由服务器代理请求）' },
+    { value: 'cmliussss', label: 'Bangumi 图片 CDN By CMLiussss' },
+    { value: 'direct', label: '直连（浏览器直接请求 lain.bgm.tv）' },
+    { value: 'custom', label: '自定义代理' },
   ];
 
   // 豆瓣图片代理选项
@@ -5322,6 +5462,8 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         DoubanImageProxy: config.SiteConfig.DoubanImageProxy || '',
         BangumiApiType: config.SiteConfig.BangumiApiType || 'server',
         BangumiApiProxy: config.SiteConfig.BangumiApiProxy || '',
+        BangumiImageProxyType: config.SiteConfig.BangumiImageProxyType || 'server',
+        BangumiImageProxy: config.SiteConfig.BangumiImageProxy || '',
         EnablePuppeteer: config.DoubanConfig?.enablePuppeteer || false,
         DoubanCookies: config.DoubanConfig?.cookies || '',
         DisableYellowFilter: config.SiteConfig.DisableYellowFilter || false,
@@ -5779,6 +5921,79 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         )}
       </div>
 
+      {/* Bangumi 图片代理设置 */}
+      <div className='space-y-3'>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Bangumi 图片代理
+          </label>
+          <div className='relative' data-dropdown='bangumi-image-proxy'>
+            <button
+              type='button'
+              onClick={() => setIsBangumiImageProxyDropdownOpen(!isBangumiImageProxyDropdownOpen)}
+              className="w-full px-3 py-2.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm hover:border-gray-400 dark:hover:border-gray-500 text-left"
+            >
+              {bangumiImageProxyTypeOptions.find(o => o.value === siteSettings.BangumiImageProxyType)?.label}
+            </button>
+            <div className='absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none'>
+              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${isBangumiImageProxyDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+            {isBangumiImageProxyDropdownOpen && (
+              <div className='absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto'>
+                {bangumiImageProxyTypeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type='button'
+                    onClick={() => {
+                      setSiteSettings(prev => ({ ...prev, BangumiImageProxyType: option.value }));
+                      setIsBangumiImageProxyDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-2.5 text-left text-sm transition-colors duration-150 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 ${siteSettings.BangumiImageProxyType === option.value ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}
+                  >
+                    <span className='truncate'>{option.label}</span>
+                    {siteSettings.BangumiImageProxyType === option.value && (
+                      <Check className='w-4 h-4 text-green-600 dark:text-green-400 shrink-0 ml-2' />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+            选择获取 Bangumi 封面图片的方式，服务器无法访问 lain.bgm.tv 时可切换
+          </p>
+          {siteSettings.BangumiImageProxyType === 'cmliussss' && (
+            <div className='mt-3'>
+              <button
+                type='button'
+                onClick={() => window.open('https://github.com/cmliu', '_blank')}
+                className='flex items-center justify-center gap-1.5 w-full px-3 text-xs text-gray-500 dark:text-gray-400 cursor-pointer'
+              >
+                <span className='font-medium'>Thanks to @CMLiussss</span>
+                <ExternalLink className='w-3.5 opacity-70' />
+              </button>
+            </div>
+          )}
+        </div>
+        {siteSettings.BangumiImageProxyType === 'custom' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Bangumi 图片代理地址
+            </label>
+            <input
+              type='text'
+              placeholder='例如: https://proxy.example.com/fetch?url='
+              value={siteSettings.BangumiImageProxy || ''}
+              onChange={(e) => setSiteSettings(prev => ({ ...prev, BangumiImageProxy: e.target.value }))}
+              className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+            />
+            <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
+              图片 URL 将以编码形式拼接在后面
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* 豆瓣 Cookies 设置 */}
       <div>
         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
@@ -6219,6 +6434,9 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
     </div>
   );
@@ -7366,6 +7584,9 @@ const LiveSourceConfig = ({
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
 
       {/* M3U 导入模态框 */}
@@ -7665,6 +7886,9 @@ const NetDiskConfig = ({
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
     </div>
   );
@@ -8304,6 +8528,9 @@ function AdminPageClient() {
         message={alertModal.message}
         timer={alertModal.timer}
         showConfirm={alertModal.showConfirm}
+        showUndo={alertModal.showUndo}
+        onUndo={alertModal.onUndo}
+        undoTimer={alertModal.undoTimer}
       />
 
       {/* 重置配置确认弹窗 */}
