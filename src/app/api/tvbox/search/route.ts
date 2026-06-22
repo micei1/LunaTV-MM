@@ -5,6 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCacheTime, getConfig } from '@/lib/config';
 import { getDetailFromApi, searchFromApi } from '@/lib/downstream';
 import { rankSearchResults } from '@/lib/search-ranking';
+import {
+  buildResolutionFilterFromSearchParams,
+  decorateSearchResultQuality,
+  filterSearchResultsByResolution,
+} from '@/lib/video-quality';
 import { yellowWords } from '@/lib/yellow';
 
 export const runtime = 'nodejs';
@@ -38,6 +43,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('wd');
     const filterParam = searchParams.get('filter') || 'on';
     const strictMode = searchParams.get('strict') === '1';
+    const resolutionFilter = buildResolutionFilterFromSearchParams(searchParams);
 
     // 参数验证
     if (!sourceKey || (!query && !wantsDetail)) {
@@ -166,6 +172,16 @@ export async function GET(request: NextRequest) {
       console.log(`[TVBox Search Proxy] Applied smart ranking`);
     }
 
+    // 🎬 分辨率推断 - 从标题/备注等文本字段推断分辨率
+    results = results.map((r) => decorateSearchResultQuality(r));
+
+    // 📺 分辨率过滤
+    if (resolutionFilter.minLevel > 0) {
+      const beforeCount = results.length;
+      results = filterSearchResultsByResolution(results, resolutionFilter);
+      console.log(`[TVBox Search Proxy] Resolution filter (>=${resolutionFilter.minLevel}p): ${beforeCount} → ${results.length}`);
+    }
+
     // ⚡ 严格匹配模式 - 只返回高度相关的结果
     if (strictMode && results.length > 0) {
       const queryLower = query.toLowerCase().trim();
@@ -216,7 +232,7 @@ export async function GET(request: NextRequest) {
           vod_id: r.id,
           vod_name: r.title,
           vod_pic: r.poster,
-          vod_remarks: raw.note || raw.remark || '',
+          vod_remarks: String(r.remarks || raw.note || raw.remark || '') || r.resolution || '',
           vod_year: raw.year || '',
           vod_area: raw.area || '',
           vod_actor: raw.actor || '',

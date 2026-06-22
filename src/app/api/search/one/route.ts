@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
+import {
+  buildResolutionFilterFromSearchParams,
+  decorateSearchResultQuality,
+  filterSearchResultsByResolution,
+} from '@/lib/video-quality';
 import { yellowWords } from '@/lib/yellow';
 
 export const runtime = 'nodejs';
@@ -17,6 +22,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
   const resourceId = searchParams.get('resourceId');
+  const resolutionFilter = buildResolutionFilterFromSearchParams(searchParams);
 
   if (!query || !resourceId) {
     const cacheTime = await getCacheTime();
@@ -57,6 +63,10 @@ export async function GET(request: NextRequest) {
         return !yellowWords.some((word: string) => typeName.includes(word));
       });
     }
+
+    // 分辨率推断 + 过滤
+    result = result.map((r) => decorateSearchResultQuality(r));
+    result = filterSearchResultsByResolution(result, resolutionFilter);
     const cacheTime = await getCacheTime();
 
     if (result.length === 0) {
