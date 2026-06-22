@@ -211,7 +211,7 @@ async function getInitConfig(configFile: string, subConfig: {
   AutoUpdate: boolean;
   LastCheck: string;
 } = {
-    URL: "",
+    URL: process.env.NEXT_PUBLIC_SUB_URL || "",
     AutoUpdate: false,
     LastCheck: "",
   }): Promise<AdminConfig> {
@@ -260,6 +260,14 @@ async function getInitConfig(configFile: string, subConfig: {
     SourceConfig: [],
     CustomCategories: [],
     LiveConfig: [],
+    TVBoxProxyConfig: {
+      enabled: false,
+      proxyUrl: process.env.NEXT_PUBLIC_CORSAPI_URL || 'https://corsapi.smone.workers.dev',
+    },
+    VideoProxyConfig: {
+      enabled: false,
+      proxyUrl: process.env.NEXT_PUBLIC_CORSAPI_URL || 'https://corsapi.smone.workers.dev',
+    },
   };
 
   // 补充用户信息
