@@ -7,7 +7,6 @@ import { getDetailFromApi, searchFromApi } from '@/lib/downstream';
 import { rankSearchResults } from '@/lib/search-ranking';
 import {
   buildResolutionFilterFromSearchParams,
-  decorateSearchResultQuality,
   filterSearchResultsByResolution,
 } from '@/lib/video-quality';
 import { yellowWords } from '@/lib/yellow';
@@ -172,10 +171,7 @@ export async function GET(request: NextRequest) {
       console.log(`[TVBox Search Proxy] Applied smart ranking`);
     }
 
-    // 🎬 分辨率推断 - 从标题/备注等文本字段推断分辨率
-    results = results.map((r) => decorateSearchResultQuality(r));
-
-    // 📺 分辨率过滤
+    // 🎬 分辨率过滤（resolution 已在 downstream 解析阶段装饰）
     if (resolutionFilter.minLevel > 0) {
       const beforeCount = results.length;
       results = filterSearchResultsByResolution(results, resolutionFilter);

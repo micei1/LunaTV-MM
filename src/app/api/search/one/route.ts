@@ -5,7 +5,6 @@ import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import {
   buildResolutionFilterFromSearchParams,
-  decorateSearchResultQuality,
   filterSearchResultsByResolution,
 } from '@/lib/video-quality';
 import { yellowWords } from '@/lib/yellow';
@@ -64,8 +63,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 分辨率推断 + 过滤
-    result = result.map((r) => decorateSearchResultQuality(r));
+    // 分辨率过滤（resolution 已在 downstream 解析阶段装饰）
     result = filterSearchResultsByResolution(result, resolutionFilter);
     const cacheTime = await getCacheTime();
 
