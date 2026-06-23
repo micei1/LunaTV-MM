@@ -5363,9 +5363,9 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
     DoubanProxy: '',
     DoubanImageProxyType: 'direct',
     DoubanImageProxy: '',
-    BangumiApiType: 'server',
+    BangumiApiType: 'cmliussss',
     BangumiApiProxy: '',
-    BangumiImageProxyType: 'server',
+    BangumiImageProxyType: 'cmliussss',
     BangumiImageProxy: '',
     EnablePuppeteer: false, // 默认关闭 Puppeteer
     DoubanCookies: '', // 默认无 Cookies
@@ -5460,9 +5460,9 @@ const SiteConfigComponent = ({ config, refreshConfig }: { config: AdminConfig | 
         DoubanImageProxyType:
           config.SiteConfig.DoubanImageProxyType || 'direct',
         DoubanImageProxy: config.SiteConfig.DoubanImageProxy || '',
-        BangumiApiType: config.SiteConfig.BangumiApiType || 'server',
+        BangumiApiType: config.SiteConfig.BangumiApiType || 'cmliussss',
         BangumiApiProxy: config.SiteConfig.BangumiApiProxy || '',
-        BangumiImageProxyType: config.SiteConfig.BangumiImageProxyType || 'server',
+        BangumiImageProxyType: config.SiteConfig.BangumiImageProxyType || 'cmliussss',
         BangumiImageProxy: config.SiteConfig.BangumiImageProxy || '',
         EnablePuppeteer: config.DoubanConfig?.enablePuppeteer || false,
         DoubanCookies: config.DoubanConfig?.cookies || '',

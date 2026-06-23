@@ -111,9 +111,9 @@ export const SettingsPanel = memo(({ isOpen, onClose }: SettingsPanelProps) => {
   const [isDoubanImageProxyDropdownOpen, setIsDoubanImageProxyDropdownOpen] = useState(false);
   const [isBangumiApiDropdownOpen, setIsBangumiApiDropdownOpen] = useState(false);
   const [isBangumiImageProxyDropdownOpen, setIsBangumiImageProxyDropdownOpen] = useState(false);
-  const [bangumiApiType, setBangumiApiType] = useState('server');
+  const [bangumiApiType, setBangumiApiType] = useState('cmliussss');
   const [bangumiApiProxy, setBangumiApiProxy] = useState('');
-  const [bangumiImageProxyType, setBangumiImageProxyType] = useState('server');
+  const [bangumiImageProxyType, setBangumiImageProxyType] = useState('cmliussss');
   const [bangumiImageProxyUrl, setBangumiImageProxyUrl] = useState('');
 
   // ── Emby config via TanStack Query ────────────────────────────────────────
@@ -224,9 +224,9 @@ export const SettingsPanel = memo(({ isOpen, onClose }: SettingsPanelProps) => {
     localStorage.setItem('doubanDataSource', defaultDoubanProxyType);
     localStorage.setItem('doubanImageProxyType', defaultDoubanImageProxyType);
     localStorage.setItem('doubanImageProxyUrl', defaultDoubanImageProxyUrl);
-    localStorage.setItem('bangumiApiType', RC.BANGUMI_API_TYPE || 'server');
+    localStorage.setItem('bangumiApiType', RC.BANGUMI_API_TYPE || 'cmliussss');
     localStorage.setItem('bangumiApiProxy', RC.BANGUMI_API_PROXY || '');
-    localStorage.setItem('bangumiImageProxyType', RC.BANGUMI_IMAGE_PROXY_TYPE || 'server');
+    localStorage.setItem('bangumiImageProxyType', RC.BANGUMI_IMAGE_PROXY_TYPE || 'cmliussss');
     localStorage.setItem('bangumiImageProxyUrl', RC.BANGUMI_IMAGE_PROXY || '');
     localStorage.setItem('continueWatchingMinProgress', '5');
     localStorage.setItem('continueWatchingMaxProgress', '100');
