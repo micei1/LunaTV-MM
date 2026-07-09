@@ -45,6 +45,7 @@ const bangumiApiTypeOptions = [
 const bangumiImageProxyTypeOptions = [
   { value: 'server', label: '服务器代理（默认，由服务器代理请求）' },
   { value: 'cmliussss', label: 'Bangumi 图片 CDN By CMLiussss' },
+  { value: 'corsapi', label: 'Cloudflare Worker 代理 By Smone' },
   { value: 'direct', label: '直连（浏览器直接请求 lain.bgm.tv）' },
   { value: 'custom', label: '自定义代理' },
 ];
