@@ -3460,17 +3460,11 @@ function PlayPageClient() {
         console.log(`💾 已保存临时播放进度到 sessionStorage: ${tempProgressKey} = ${currentPlayTime.toFixed(2)}s`);
       }
 
-      // 清除前一个历史记录
+      // 清除前一个历史记录（不阻塞换源流程，异步执行）
       if (currentSourceRef.current && currentIdRef.current) {
-        try {
-          await deletePlayRecord(
-            currentSourceRef.current,
-            currentIdRef.current
-          );
-          console.log('已清除前一个播放记录');
-        } catch (err) {
-          console.error('清除播放记录失败:', err);
-        }
+        deletePlayRecord(currentSourceRef.current, currentIdRef.current)
+          .then(() => console.log('已清除前一个播放记录'))
+          .catch((err) => console.error('清除播放记录失败:', err));
       }
 
       const newDetail = availableSources.find(
