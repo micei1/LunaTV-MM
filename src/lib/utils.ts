@@ -260,6 +260,19 @@ export function stripVideoPlayProxy(url: string): string | null {
   }
 }
 
+// 直连原始地址失败（上游要求特定 Referer/UA 或不返回 CORS 头）时，最后一层兜底：
+// 改走本站自带的 /api/proxy/m3u8，由服务端代为请求并改写分片/密钥 URI。
+// 与 applyVideoPlayProxy 的外部 Worker 相互独立，不依赖 VideoProxyConfig 是否启用。
+export function applyFirstPartyM3u8Proxy(url: string): string {
+  if (!url || typeof window === 'undefined') return url;
+  return `/api/proxy/m3u8?url=${encodeURIComponent(url)}`;
+}
+
+// 判断某地址是否已经指向本站的第一方 m3u8 代理，避免重复包裹
+export function isFirstPartyM3u8Proxy(url: string): boolean {
+  return !!url && url.startsWith('/api/proxy/m3u8?url=');
+}
+
 // 新增：格式化速度显示
 export function formatVideoLoadSpeed(speedKBps?: number): string {
   if (!speedKBps || !Number.isFinite(speedKBps) || speedKBps <= 0) {

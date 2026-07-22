@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 
 import { getConfig } from "@/lib/config";
+import { DEFAULT_USER_AGENT } from "@/lib/user-agent";
 
 export const runtime = 'nodejs';
 
@@ -81,12 +82,16 @@ export async function GET(request: Request) {
   }
 
   const config = await getConfig();
-  const liveSource = config.LiveConfig?.find((s: any) => s.key === source);
-  if (!liveSource) {
-    keyStats.errors++;
-    return NextResponse.json({ error: 'Source not found' }, { status: 404 });
+  // 点播场景不携带 moontv-source（该参数只用于直播源的 UA 定制），此时使用默认浏览器 UA。
+  let ua = DEFAULT_USER_AGENT;
+  if (source) {
+    const liveSource = config.LiveConfig?.find((s: any) => s.key === source);
+    if (!liveSource) {
+      keyStats.errors++;
+      return NextResponse.json({ error: 'Source not found' }, { status: 404 });
+    }
+    ua = liveSource.ua || ua;
   }
-  const ua = liveSource.ua || 'AptvPlayer/1.4.10';
 
   const decodedUrl = decodeURIComponent(url);
   const cacheKey = `${source}-${decodedUrl}`;

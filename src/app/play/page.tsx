@@ -58,7 +58,7 @@ import {
 } from '@/lib/db.client';
 import { getDoubanDetails, getDoubanComments, getDoubanActorMovies } from '@/lib/douban.client';
 import { SearchResult } from '@/lib/types';
-import { applyVideoPlayProxy, getVideoResolutionFromM3u8, processImageUrl, stripVideoPlayProxy, VideoSourceTestResult } from '@/lib/utils';
+import { applyFirstPartyM3u8Proxy, applyVideoPlayProxy, getVideoResolutionFromM3u8, isFirstPartyM3u8Proxy, processImageUrl, stripVideoPlayProxy, VideoSourceTestResult } from '@/lib/utils';
 import { useWatchRoomContextSafe } from '@/components/WatchRoomProvider';
 import { useWatchRoomSync } from './hooks/useWatchRoomSync';
 import {
@@ -4445,8 +4445,11 @@ function PlayPageClient() {
               video.hls.destroy();
             }
 
-            // ☁️ 新地址加载，重置 Worker 代理降级标记
+            // ☁️ 新地址加载，重置 Worker 代理 / 第一方代理降级标记
             (video as any)._proxyFallbackDone = false;
+            (video as any)._firstPartyProxyFallbackDone = false;
+            (video as any)._currentHlsUrl = url;
+            (video as any)._consecutiveNetworkErrorCount = 0;
 
             // 在函数内部重新检测iOS13+设备
             const localIsIOS13 = isIOS13;
@@ -4576,6 +4579,36 @@ function PlayPageClient() {
               savePreferredAudioLang(switchedTrack?.language);
             });
 
+            // 依次尝试：Worker 代理 -> 直连 -> 本站第一方代理，每一级只降级一次。
+            // 返回 true 表示已发起下一级 loadSource，调用方不应再做其他恢复动作；
+            // 返回 false 表示所有降级手段已用尽。
+            const tryFallbackOrGiveUp = (): boolean => {
+              const activeUrl = (video as any)._currentHlsUrl || url;
+
+              // ☁️ Worker 代理请求失败（超时/502/畸形响应等）时，自动降级到直连原始地址
+              const rawUrl = !(video as any)._proxyFallbackDone ? stripVideoPlayProxy(activeUrl) : null;
+              if (rawUrl) {
+                console.warn('Worker 代理错误，降级为直连:', rawUrl);
+                (video as any)._proxyFallbackDone = true;
+                (video as any)._currentHlsUrl = rawUrl;
+                (video as any)._consecutiveNetworkErrorCount = 0;
+                hls.loadSource(rawUrl);
+                return true;
+              }
+              // 🧭 直连失败时，最后尝试走本站第一方 m3u8 代理——常见于上游要求
+              // 特定 Referer/UA 或不返回 CORS 头，浏览器直连必然失败。
+              if (!(video as any)._firstPartyProxyFallbackDone && !isFirstPartyM3u8Proxy(activeUrl)) {
+                (video as any)._firstPartyProxyFallbackDone = true;
+                const proxiedUrl = applyFirstPartyM3u8Proxy(activeUrl);
+                console.warn('直连错误，降级为第一方代理:', proxiedUrl);
+                (video as any)._currentHlsUrl = proxiedUrl;
+                (video as any)._consecutiveNetworkErrorCount = 0;
+                hls.loadSource(proxiedUrl);
+                return true;
+              }
+              return false;
+            };
+
             hls.on(Hls.Events.ERROR, function (event: any, data: any) {
               console.error('HLS Error:', event, data);
 
@@ -4605,15 +4638,31 @@ function PlayPageClient() {
                 return;
               }
 
+              // 旧版/不兼容的代理（例如未实现 m3u8 重写的 Worker）常常不会让 hls.js
+              // 判定为 fatal：分片请求持续失败但清晰度切换/内部重试机制会不断吸收错误，
+              // 播放器只是卡住不报错。这里独立计数非 fatal 的网络错误，达到阈值时
+              // 主动触发降级，而不是干等一个永远不会到来的 fatal 事件。
+              if (
+                !data.fatal &&
+                data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+                (data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+                  data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT ||
+                  data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+                  data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT)
+              ) {
+                const count = ((video as any)._consecutiveNetworkErrorCount || 0) + 1;
+                (video as any)._consecutiveNetworkErrorCount = count;
+                if (count >= 8) {
+                  console.warn(`连续 ${count} 次非致命网络错误，主动降级:`, data.details);
+                  tryFallbackOrGiveUp();
+                }
+                return;
+              }
+
               if (data.fatal) {
                 switch (data.type) {
                   case Hls.ErrorTypes.NETWORK_ERROR: {
-                    // ☁️ Worker 代理请求致命失败（超时/502等）时，自动降级到直连原始地址，避免播放中断
-                    const rawUrl = !(video as any)._proxyFallbackDone ? stripVideoPlayProxy(url) : null;
-                    if (rawUrl) {
-                      console.warn('Worker 代理网络错误，降级为直连:', rawUrl);
-                      (video as any)._proxyFallbackDone = true;
-                      hls.loadSource(rawUrl);
+                    if (tryFallbackOrGiveUp()) {
                       break;
                     }
                     console.log('网络错误，尝试恢复...');
@@ -4625,6 +4674,11 @@ function PlayPageClient() {
                     hls.recoverMediaError();
                     break;
                   default:
+                    // OTHER_ERROR / MUX_ERROR / KEY_SYSTEM_ERROR 等非网络类致命错误，
+                    // 仍有可能是代理返回了畸形内容导致的解封装失败，降级一次再放弃。
+                    if (tryFallbackOrGiveUp()) {
+                      break;
+                    }
                     console.log('无法恢复的错误');
                     hls.destroy();
                     break;

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { getConfig } from "@/lib/config";
 import { getBaseUrl, resolveUrl } from "@/lib/live";
+import { DEFAULT_USER_AGENT } from "@/lib/user-agent";
 
 export const runtime = 'nodejs';
 
@@ -50,12 +51,17 @@ export async function GET(request: Request) {
   }
 
   const config = await getConfig();
-  const liveSource = config.LiveConfig?.find((s: any) => s.key === source);
-  if (!liveSource) {
-    stats.errors++;
-    return NextResponse.json({ error: 'Source not found' }, { status: 404 });
+  // moontv-source 仅用于直播源的 UA 定制；点播场景（VOD 直连失败降级）不传该参数，
+  // 此时使用浏览器 UA 默认值而非要求匹配 LiveConfig，否则会 404 拒绝点播流量。
+  let ua = DEFAULT_USER_AGENT;
+  if (source) {
+    const liveSource = config.LiveConfig?.find((s: any) => s.key === source);
+    if (!liveSource) {
+      stats.errors++;
+      return NextResponse.json({ error: 'Source not found' }, { status: 404 });
+    }
+    ua = liveSource.ua || ua;
   }
-  const ua = liveSource.ua || 'AptvPlayer/1.4.10';
 
   let response: Response | null = null;
   let responseUsed = false;
