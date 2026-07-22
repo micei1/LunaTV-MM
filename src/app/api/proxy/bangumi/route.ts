@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getCacheTime, getConfig } from '@/lib/config';
+import { readTextLimited } from '@/lib/proxy-security';
 
 const CMLIUSSSS_BASE = 'https://img.doubanio.cmliussss.net';
+
+// Bangumi 响应体大小硬上限，防止异常上游返回超大响应把内存打爆
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * Bangumi API 代理路由
@@ -57,7 +61,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    const text = await readTextLimited(response, MAX_RESPONSE_BYTES);
+    const data = JSON.parse(text);
 
     return NextResponse.json(data, {
       headers: {

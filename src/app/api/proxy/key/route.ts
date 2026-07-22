@@ -3,9 +3,13 @@
 import { NextResponse } from "next/server";
 
 import { getConfig } from "@/lib/config";
+import { readArrayBufferLimited } from "@/lib/proxy-security";
 import { DEFAULT_USER_AGENT } from "@/lib/user-agent";
 
 export const runtime = 'nodejs';
+
+// AES 密钥文件正常只有 16 字节，给个宽松上限防御异常上游
+const MAX_KEY_BYTES = 1 * 1024 * 1024; // 1MB
 
 // Key 缓存管理
 const keyCache = new Map<string, { data: ArrayBuffer; timestamp: number; etag?: string }>();
@@ -178,7 +182,7 @@ export async function GET(request: Request) {
       }, { status: response.status >= 500 ? 500 : response.status });
     }
     
-    const keyData = await response.arrayBuffer();
+    const keyData = await readArrayBufferLimited(response, MAX_KEY_BYTES);
     const etag = response.headers.get('ETag');
     
     // 缓存 key 数据

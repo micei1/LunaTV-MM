@@ -4,7 +4,11 @@ import { NextResponse } from "next/server";
 
 import { getConfig } from "@/lib/config";
 import { getBaseUrl, resolveUrl } from "@/lib/live";
+import { readTextLimited } from "@/lib/proxy-security";
 import { DEFAULT_USER_AGENT } from "@/lib/user-agent";
+
+// m3u8 manifest 响应体大小硬上限，防止异常上游返回超大响应把内存打爆
+const MAX_M3U8_BYTES = 5 * 1024 * 1024; // 5MB
 
 export const runtime = 'nodejs';
 
@@ -151,7 +155,7 @@ export async function GET(request: Request) {
     if (isM3U8) {
       // 获取最终的响应URL（处理重定向后的URL）
       const finalUrl = response.url;
-      const m3u8Content = await response.text();
+      const m3u8Content = await readTextLimited(response, MAX_M3U8_BYTES);
       responseUsed = true;
 
       // 更新统计信息
